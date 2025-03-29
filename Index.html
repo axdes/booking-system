@@ -1,351 +1,57 @@
 <!DOCTYPE html>
+
 <html>
+
 <head>
-  <base target="_top">
-  <meta charset="UTF-8" />
-  <title>Бронирование Kvetka</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      max-width: 900px;
-      margin: 0 auto;
-      padding: 1rem;
-      background: #f5f5f5;
-    }
-    h2, h3 { color: #333; text-align: center; }
-    label { font-weight: bold; display: block; margin-top: 1rem; }
-    input, select, textarea {
-      width: 100%; padding: 0.5rem; margin-top: 0.3rem;
-      border-radius: 5px; border: 1px solid #ccc; box-sizing: border-box;
-    }
-    button {
-      margin-top: 1rem; padding: 0.7rem 1.5rem;
-      background-color: #007BFF; color: white;
-      border: none; border-radius: 5px; cursor: pointer;
-      font-size: 1rem;
-    }
-    button:hover { background-color: #0056b3; }
-    #paymentInfo, #formSection { display: none; }
-    #loading { display: none; text-align: center; font-size: 1.2rem; color: #007BFF; }
 
-    .calendar-container {
-      display: flex; flex-wrap: wrap; gap: 20px;
-      justify-content: center;
-    }
-    .month {
-      border: 1px solid #ccc; padding: 10px; background: white; width: 240px;
-    }
-    .month h3 { text-align: center; margin: 0 0 10px; }
-    .days {
-      display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px;
-    }
-    .day {
-      text-align: center; padding: 5px; border-radius: 5px; cursor: pointer;
-    }
-    .day.busy { background: #ccc; color: #888; cursor: not-allowed; }
-    .day.selected { background: #ffeeba; border: 1px solid #ffa500; }
-    .day.range { background: #fff3cd; }
-    #selectedRange { text-align: center; margin-top: 1rem; font-weight: bold; }
+<base target="_top">
 
-    @media(max-width: 600px) {
-      .calendar-container { flex-direction: column; align-items: center; }
-      .month { width: 90%; }
-    }
-  </style>
+<meta charset="UTF-8">
+
+<title>Kvetka Booking</title>
+
+
+
+<!-- 1) scripts FIRST, to define choosePlan etc. -->
+
+<?!= include('scripts') ?>
+
+
+
+<!-- 2) styles NEXT -->
+
+<?!= include('styles') ?>
+
 </head>
+
 <body>
-  <h2>Выбор дат проживания</h2>
-  <div class="calendar-container" id="calendar"></div>
-  <div id="selectedRange"></div>
-  <div style="text-align:center">
-    <button id="continueBtn" style="display:none">Перейти к бронированию</button>
-  </div>
 
-  <div id="formSection">
-    <h3>Форма бронирования</h3>
-    <form id="bookingForm">
-      <label>Дата заезда:</label>
-      <input type="date" name="checkin" id="checkin" readonly>
+<script>
 
-      <label>Дата выезда:</label>
-      <input type="date" name="checkout" id="checkout" readonly>
+window.busyDates = JSON.parse('<?= busyDatesJson ?>');
 
-      <label>Email:</label>
-      <input type="email" name="email" id="email" required>
+window.config = JSON.parse('<?= configJson ?>');
 
-      <label>Ваше имя:</label>
-      <input type="text" name="name" id="name" required>
+window.optionsArr = JSON.parse('<?= optionsJson ?>');
 
-      <label>Телефон:</label>
-      <input type="tel" name="phone" id="phone">
+window.includedItems= JSON.parse('<?= includedJson ?>');
 
-      <label>Кол-во взрослых:</label>
-      <input type="number" name="guests" id="guests" min="1" max="4" value="1">
+</script>
 
-      <label>Кол-во детей:</label>
-      <input type="number" name="children" id="children" min="0" max="3" value="0">
 
-      <label>Домашние животные:</label>
-      <input type="number" name="pets" id="pets" min="0" value="0">
 
-      <label>Способ оплаты:</label>
-      <select name="paymentMethod" id="paymentMethod">
-        <option value="Наличные">Наличные</option>
-        <option value="Карта">Карта</option>
-        <option value="Перевод">Перевод</option>
-      </select>
+<!-- 3) steps LAST, references to choosePlan etc. are safe now. -->
 
-      <label>Комментарий:</label>
-      <textarea name="comment" id="comment"></textarea>
-
-      <div id="price"></div>
-      <button type="submit">Перейти к оплате</button>
-    </form>
-  </div>
-
-  <div id="paymentInfo">
-    <h3>Оплата</h3>
-    <p>Загрузите чек после оплаты, чтобы подтвердить бронь.</p>
-    <form id="paymentForm">
-      <label>Загрузить чек:</label>
-      <input type="file" id="receipt" />
-      <input type="button" id="uploadButton" value="Загрузить" onclick="uploadFile()" />
-      <div id="progress"></div>
-      <div id="paymentCalculation"></div>
-      <button type="submit">Отправить</button>
-    </form>
-  </div>
-
-  <div id="result"></div>
-  <div id="loading">Загрузка...</div>
-
-  <script>
-    let busyDates = [];
-    let selected = [];
-
-    function formatDate(date) {
-      return date.toISOString().split('T')[0];
+<?!= include('steps') ?>
+<script>
+  // Дождёмся полной загрузки DOM и только потом вызовем choosePlan
+  setTimeout(() => {
+    if (window.choosePlan) {
+      window.choosePlan(window.myPlan || 'custom');
     }
+  }, 100);
+</script>
 
-    function renderCalendar() {
-      const container = document.getElementById('calendar');
-      container.innerHTML = '';
-      const today = new Date();
-
-      for (let i = 0; i < 4; i++) {
-        const base = new Date(today.getFullYear(), today.getMonth() + i, 1);
-        const year = base.getFullYear();
-        const month = base.getMonth();
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-        const monthDiv = document.createElement('div');
-        monthDiv.className = 'month';
-        const header = document.createElement('h3');
-        header.textContent = base.toLocaleString('ru-RU', { month: 'long', year: 'numeric' });
-        monthDiv.appendChild(header);
-
-        const daysGrid = document.createElement('div');
-        daysGrid.className = 'days';
-
-        const firstDay = new Date(year, month, 1).getDay();
-        const offset = firstDay === 0 ? 6 : firstDay - 1;
-        for (let j = 0; j < offset; j++) {
-          daysGrid.appendChild(document.createElement('div'));
-        }
-
-        for (let d = 1; d <= daysInMonth; d++) {
-          const date = new Date(year, month, d);
-          const dateStr = formatDate(date);
-          const dayDiv = document.createElement('div');
-          dayDiv.className = 'day';
-          dayDiv.textContent = d;
-
-          if (busyDates.includes(dateStr) || date < today) {
-            dayDiv.classList.add('busy');
-          } else {
-            dayDiv.addEventListener('click', () => selectRange(dateStr));
-          }
-
-          daysGrid.appendChild(dayDiv);
-        }
-
-        monthDiv.appendChild(daysGrid);
-        container.appendChild(monthDiv);
-      }
-    }
-
-    function selectRange(dateStr) {
-      if (selected.length === 2) selected = [];
-      selected.push(dateStr);
-      selected.sort();
-      updateSelectedRange();
-    }
-
-    function updateSelectedRange() {
-      const rangeDiv = document.getElementById('selectedRange');
-      const days = document.querySelectorAll('.day');
-      days.forEach(d => d.classList.remove('selected', 'range'));
-
-      if (selected.length === 1) {
-        rangeDiv.textContent = `Вы выбрали: ${selected[0]}`;
-      } else if (selected.length === 2) {
-        const [start, end] = selected;
-        const current = new Date(start);
-        const endDate = new Date(end);
-        const range = [];
-        let hasBusy = false;
-
-        while (current <= endDate) {
-          const str = formatDate(current);
-          if (busyDates.includes(str)) hasBusy = true;
-          range.push(str);
-          current.setDate(current.getDate() + 1);
-        }
-
-        if (hasBusy) {
-          alert('В выбранном диапазоне есть занятые даты!');
-          selected = [];
-          updateSelectedRange();
-          return;
-        }
-
-        days.forEach(d => {
-          const parent = d.closest('.month');
-          const label = parent.querySelector('h3').textContent;
-          const monthMap = {
-            'январь': 0, 'февраль': 1, 'март': 2, 'апрель': 3, 'май': 4, 'июнь': 5,
-            'июль': 6, 'август': 7, 'сентябрь': 8, 'октябрь': 9, 'ноябрь': 10, 'декабрь': 11
-          };
-          const [monthName, year] = label.split(' ');
-          const date = new Date(Number(year), monthMap[monthName.toLowerCase()], Number(d.textContent));
-          const str = formatDate(date);
-          if (range.includes(str)) d.classList.add('range');
-        });
-
-        rangeDiv.textContent = `Вы выбрали: ${start} - ${end}`;
-        document.getElementById('checkin').value = start;
-        document.getElementById('checkout').value = end;
-        document.getElementById('continueBtn').style.display = 'inline-block';
-      } else {
-        rangeDiv.textContent = '';
-        document.getElementById('continueBtn').style.display = 'none';
-      }
-    }
-
-    document.getElementById('continueBtn').addEventListener('click', () => {
-      document.getElementById('formSection').scrollIntoView({ behavior: 'smooth' });
-      document.getElementById('formSection').style.display = 'block';
-    });
-
-    document.getElementById('bookingForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      document.getElementById('paymentInfo').style.display = 'block';
-      updatePaymentCalculation();
-    });
-
-    document.getElementById('paymentForm').addEventListener('submit', function(e) {
-      e.preventDefault();
-      document.getElementById('loading').style.display = 'block';
-
-      const formData = {
-        email: document.getElementById('email').value,
-        checkin: document.getElementById('checkin').value,
-        checkout: document.getElementById('checkout').value,
-        name: document.getElementById('name').value,
-        phone: document.getElementById('phone').value,
-        guests: document.getElementById('guests').value,
-        children: document.getElementById('children').value,
-        pets: document.getElementById('pets').value,
-        paymentMethod: document.getElementById('paymentMethod').value,
-        comment: document.getElementById('comment').value,
-        receiptFileUrl: document.getElementById('receipt').dataset.fileUrl
-      };
-
-      google.script.run.withSuccessHandler(msg => {
-        document.getElementById('result').innerHTML = msg;
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('formSection').style.display = 'none';
-        document.getElementById('paymentInfo').style.display = 'none';
-      }).withFailureHandler(err => {
-        document.getElementById('result').textContent = 'Ошибка: ' + err.message;
-        document.getElementById('loading').style.display = 'none';
-      }).addReservation(formData);
-    });
-
-    function calculateCost(checkinDate, checkoutDate, guests, children, pets) {
-      const config = JSON.parse('<?= JSON.stringify(config) ?>');
-      const nightCount = Math.round((checkoutDate - checkinDate) / (1000 * 60 * 60 * 24));
-      const day = checkinDate.getDay();
-      const weekdays = [1, 2, 3, 4];
-      const basePrice = weekdays.includes(day) ? config.weekdayPrice :
-                        day === 5 ? config.fridayPrice :
-                        day === 6 ? config.saturdayPrice : config.sundayPrice;
-      const totalBase = basePrice * nightCount;
-      const extraGuests = Math.max(0, guests - 2) * config.extraGuest;
-      const extraChildren = Math.max(0, children - 1) * config.extraChild;
-      const extraPets = pets * config.extraPet;
-      const total = totalBase + extraGuests + extraChildren + extraPets;
-      const prepayment = config.prepayment * nightCount;
-      const toPay = total - prepayment;
-
-      let priceDetails = `<p><b>Кол-во ночей:</b> ${nightCount}</p><p><b>Базовая ставка:</b> ${totalBase.toFixed(2)} BYN</p>`;
-      if (extraGuests > 0) priceDetails += `<p><b>Доп. гости:</b> ${extraGuests.toFixed(2)} BYN</p>`;
-      if (extraChildren > 0) priceDetails += `<p><b>Доп. дети:</b> ${extraChildren.toFixed(2)} BYN</p>`;
-      if (extraPets > 0) priceDetails += `<p><b>Доп. животные:</b> ${extraPets.toFixed(2)} BYN</p>`;
-      priceDetails += `<p><b>Итого:</b> ${total.toFixed(2)} BYN</p>`;
-
-      return { total, prepayment, toPay, priceDetails };
-    }
-
-    function updatePaymentCalculation() {
-      const checkin = new Date(document.getElementById('checkin').value);
-      const checkout = new Date(document.getElementById('checkout').value);
-      const guests = parseInt(document.getElementById('guests').value);
-      const children = parseInt(document.getElementById('children').value);
-      const pets = parseInt(document.getElementById('pets').value);
-
-      const { total, prepayment, toPay, priceDetails } = calculateCost(checkin, checkout, guests, children, pets);
-      const paymentDetails = `${priceDetails}<p><b>Предоплата:</b> ${prepayment.toFixed(2)} BYN</p><p><b>Остаток к оплате:</b> ${toPay.toFixed(2)} BYN</p>`;
-      document.getElementById('paymentCalculation').innerHTML = paymentDetails;
-    }
-
-    function uploadFile() {
-      const uploadButton = document.getElementById('uploadButton');
-      uploadButton.disabled = true;
-      document.getElementById('loading').style.display = 'block';
-      const file = document.getElementById('receipt').files[0];
-
-      if (!file) {
-        alert('Пожалуйста, выберите файл.');
-        uploadButton.disabled = false;
-        document.getElementById('loading').style.display = 'none';
-        return;
-      }
-
-      const reader = new FileReader();
-      reader.onload = function(event) {
-        const [meta, data] = event.target.result.split(',');
-        const mimeType = meta.match(/:(.*?);/)[1];
-
-        google.script.run.withSuccessHandler(url => {
-          document.getElementById('receipt').dataset.fileUrl = url;
-          document.getElementById('progress').innerText = 'Загрузка завершена';
-          uploadButton.disabled = false;
-          document.getElementById('loading').style.display = 'none';
-        }).withFailureHandler(err => {
-          document.getElementById('progress').innerText = 'Ошибка: ' + err.message;
-          uploadButton.disabled = false;
-          document.getElementById('loading').style.display = 'none';
-        }).saveFile({ fileName: file.name, mimeType, data });
-      };
-
-      reader.readAsDataURL(file);
-    }
-
-    google.script.run.withSuccessHandler(data => {
-      busyDates = data.map(d => new Date(d.checkin).toISOString().split('T')[0]);
-      renderCalendar();
-    }).listBookings();
-  </script>
 </body>
+
 </html>
