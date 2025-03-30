@@ -1,122 +1,186 @@
-<!-- Шаг 1 -->
+<script>
+// ============ Переход на следующий шаг ============
+// Решаем — показывать ли шаг по дням или сразу к контактам
+function decideNextStep() {
+  let chosen = collectStep1Options();
 
-<div class="booking-container" id="calendarBlock">
-<!-- Визуальный прогресс -->
-<div id="stepProgress" class="step-progress">
-  <div class="step" id="step1">1. План и даты</div>
-  <div class="step" id="step2">2. Опции по дням</div>
-  <div class="step" id="step3">3. Контакты</div>
-</div>
-<h3>Выберите план</h3>
-<div class="plan-cards">
-  <div class="plan-card" onclick="choosePlan('max')">
-    <div class="plan-card-title">MAX</div>
-    <p>+100 р. за ночь, все базовые опции бесплатно</p>
-  </div>
-  <div class="plan-card" onclick="choosePlan('relax')">
-    <div class="plan-card-title">RELAX</div>
-    <p>Базовая цена, баня/чан/веник бесплатно</p>
-  </div>
-  <div class="plan-card" onclick="choosePlan('custom')">
-    <div class="plan-card-title">CUSTOM</div>
-    <p>-200 р. за ночь, выберите нужные опции вручную</p>
-  </div>
-</div>
+  if (window.myPlan === 'custom') {
+    if (chosen.length === 0) {
+      goToFinalStep();
+    } else {
+      goToDayByDay();
+    }
+  } else {
+    // Если план max/relax — исключаем опции бани, чана и веника
+    let realChosen = chosen.filter(id => !['banya', 'chan', 'bath_broom'].includes(id));
+    if (realChosen.length === 0) {
+      goToFinalStep();
+    } else {
+      goToDayByDay();
+    }
+  }
+}
 
-<div id="planDescription" style="margin:0.5rem 0; font-weight:bold;"></div>
+// Собираем все выбранные опции на первом шаге
+function collectStep1Options() {
+  let chosen = [];
 
-<!-- Показ базовых опций кнопками для CUSTOM -->
-<div id="customOptions" style="display:none">
-  <p>Выберите базовые опции:</p>
-  <div id="customBaseButtons" class="option-buttons"></div>
-</div>
-<div id="calendarPriceInfo" class="calendar-price-info" style="display:none;"></div>
+  if (window.myPlan === 'custom') {
+    let baseDiv = document.getElementById('manualBase');
+    if (baseDiv) {
+      let c = baseDiv.querySelectorAll('input[type=checkbox]:checked');
+      c.forEach(ch => chosen.push(ch.value));
+    }
+  }
 
-<h3>Выберите даты</h3>
-<div id="calendar"></div>
-<div id="selectedRange"></div>
-<div id="dateError" class="error" style="display:none"></div>
+  let ex = document.getElementById('extraBlock');
+  if (ex) {
+    let c = ex.querySelectorAll('input[type=checkbox]:checked');
+    c.forEach(ch => chosen.push(ch.value));
+  }
 
-<h4>Дополнительные опции</h4>
-<div id="extraBlock"></div>
-
-<h3>Состав гостей</h3>
-
-<label>Взрослые:</label>
-<div class="btn-group">
-  <button onclick="decrease('adults')">-</button>
-  <span id="adultsCount">2</span>
-  <button onclick="increase('adults')">+</button>
-</div>
-<br>
-
-<label>Дети (3..10):</label>
-<div class="btn-group">
-  <button onclick="decrease('kids')">-</button>
-  <span id="kidsCount">0</span>
-  <button onclick="increase('kids')">+</button>
-</div>
-<br>
-
-<label>Младенцы (0..2):</label>
-<div class="btn-group">
-  <button onclick="decrease('babies')">-</button>
-  <span id="babiesCount">0</span>
-  <button onclick="increase('babies')">+</button>
-</div>
-<label><input type="checkbox" id="babyBed"> Кроватка?</label>
-<br>
-
-<label>Животные:</label>
-<div class="btn-group">
-  <button onclick="decrease('pets')">-</button>
-  <span id="petsCount">0</span>
-  <button onclick="increase('pets')">+</button>
-</div>
-
-<div id="priceDetails"></div>
-<button id="proceedBtn" onclick="decideNextStep()" disabled>Далее</button>
-
-</div>
+  return chosen;
+}
 
 
+// ============ Шаг 2: day-by-day ============
+// Переход к выбору опций по каждому дню
+function goToDayByDay() {
+  document.getElementById('calendarBlock').style.display = 'none';
+  document.getElementById('dayByDayBlock').style.display = 'block';
+  buildDayTable();
+  autoCalculateDayByDay();
+  updateProgress(2);
+}
 
-<!-- Шаг 2: day-by-day -->
-<div class="booking-container" id="dayByDayBlock" style="display:none">
-<h3>Выберите опции по каждому дню</h3>
-<button onclick="goBackToCalendar()">Назад</button>
-<table id="dayTable" border="1"></table>
-<div id="dailyPriceResult"></div>
-<button onclick="goToFinalStep()">Далее</button>
-</div>
+function goBackToCalendar() {
+  document.getElementById('dayByDayBlock').style.display = 'none';
+  document.getElementById('calendarBlock').style.display = 'block';
+  updateProgress(1);
+}
+
+// Строим таблицу опций по дням
+function buildDayTable() {
+  let dayTable = document.getElementById('dayTable');
+  dayTable.innerHTML = '';
+
+  if (window.selectedDates.length < 2) {
+    dayTable.innerHTML = '<tr><td>Нужно выбрать не менее 2 дат</td></tr>';
+    return;
+  }
+
+  let start = new Date(window.selectedDates[0] + 'T12:00:00');
+  let end = new Date(window.selectedDates[1] + 'T12:00:00');
+  let rows = [];
+  let currentDate = new Date(start);
+
+  while (currentDate <= end) {
+    rows.push(currentDate.toISOString().split('T')[0]);
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  let chosenStep1 = collectStep1Options();
+  let relevant = (window.myPlan === 'custom')
+    ? chosenStep1
+    : chosenStep1.filter(id => !['banya', 'chan', 'bath_broom'].includes(id));
+
+  if (relevant.length === 0) {
+    dayTable.innerHTML = '<tr><td>Нет опций, требующих распределения по дням</td></tr>';
+    return;
+  }
+
+  let thead = document.createElement('thead');
+  let htr = document.createElement('tr');
+  let thDate = document.createElement('th');
+  thDate.textContent = 'Дата';
+  htr.appendChild(thDate);
+
+  relevant.forEach(id => {
+    let op = window.optionsArr.find(x => x.id === id);
+    let th = document.createElement('th');
+    th.textContent = op ? op.title : id;
+    htr.appendChild(th);
+  });
+
+  thead.appendChild(htr);
+  dayTable.appendChild(thead);
+
+  let tbody = document.createElement('tbody');
+  rows.forEach(ds => {
+    let tr = document.createElement('tr');
+    let tdDate = document.createElement('td');
+    const dObj = new Date(ds + 'T12:00:00');
+    const options = { day: 'numeric', month: 'long', weekday: 'short' };
+    tdDate.textContent = dObj.toLocaleDateString('ru-RU', options);
+    tr.appendChild(tdDate);
+
+    relevant.forEach(id => {
+      let td = document.createElement('td');
+      td.innerHTML = `<input type="checkbox" data-day="${ds}" data-opt="${id}" onchange="autoCalculateDayByDay()">`;
+      tr.appendChild(td);
+    });
+
+    tbody.appendChild(tr);
+  });
+
+  dayTable.appendChild(tbody);
+}
+
+// Автоматический расчёт стоимости по выбранным дням
+function autoCalculateDayByDay() {
+  let checks = document.querySelectorAll('#dayTable input[type=checkbox]:checked');
+  let dayMap = {};
+
+  checks.forEach(ch => {
+    let ds = ch.getAttribute('data-day');
+    let opt = ch.getAttribute('data-opt');
+    if (!dayMap[ds]) dayMap[ds] = [];
+    dayMap[ds].push(opt);
+  });
+
+  let daySelections = [];
+  let trs = document.querySelectorAll('#dayTable tbody tr');
+
+  trs.forEach(tr => {
+    let ds = tr.cells[0].textContent.trim();
+    if (ds) {
+      daySelections.push({ date: ds, chosen: (dayMap[ds] || []) });
+    }
+  });
+
+  google.script.run
+    .withSuccessHandler(br => {
+      let html = `<p><b>Итого:</b> ${br.total} р.</p>`;
+      br.lines.forEach(line => {
+        html += `<p>${line.label}: <b>${line.cost}</b></p>`;
+      });
+      document.getElementById('dailyPriceResult').innerHTML = html;
+      let fDiv = document.getElementById('finalPrice');
+      if (fDiv) fDiv.innerHTML = html;
+    })
+    .withFailureHandler(err => {
+      document.getElementById('dailyPriceResult').innerHTML = 'Ошибка:' + err.message;
+      const fDiv = document.getElementById('finalPrice');
+      if (fDiv) fDiv.innerHTML = 'Ошибка:' + err.message;
+    })
+    .getCostBreakdownDaily(
+      window.myPlan,
+      daySelections,
+      window.adultCount,
+      window.kidCount,
+      window.babyCount,
+      document.getElementById('babyBed').checked,
+      window.petCount
+    );
+}
 
 
+// ============ Переход к финальному шагу ============
 
-
-<!-- Шаг 3: contacts + check -->
-<div class="booking-container" id="contactForm" style="display:none">
-
-<h3>Контакты</h3>
-<label>Имя:</label>
-<input type="text" id="name"><br><br>
-
-<label>Email:</label>
-<input type="email" id="email"><br><br>
-
-<label>Телефон:</label>
-<input type="tel" id="phone"><br><br>
-
-<label>Комментарий:</label>
-<textarea id="comment"></textarea><br><br>
-
-<div>
-  <label>Загрузите чек:</label>
-  <input type="file" id="receipt">
-  <button onclick="uploadReceipt()">Загрузить</button>
-  <div id="loader" style="display:none">Загрузка...</div>
-</div>
-<div id="result"></div>
-
-<div id="finalPrice"></div>
-<button onclick="submitBookingDayByDay()">Подтвердить бронь</button>
-</div>
+function goToFinalStep() {
+  document.getElementById('dayByDayBlock').style.display = 'none';
+  document.getElementById('contactForm').style.display = 'block';
+  autoCalculateDayByDay();
+  updateProgress(3);
+}
+  </script>

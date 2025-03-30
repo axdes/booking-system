@@ -1,57 +1,47 @@
 <!DOCTYPE html>
-
-<html>
-
+<html lang="ru">
 <head>
-
-<base target="_top">
-
-<meta charset="UTF-8">
-
-<title>Kvetka Booking</title>
-
-
-
-<!-- 1) scripts FIRST, to define choosePlan etc. -->
-
-<?!= include('scripts') ?>
+  
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Kvetka Booking</title>
 
 
 
-<!-- 2) styles NEXT -->
-
-<?!= include('styles') ?>
-
+  <!-- 🎨 Стили: затем оформление -->
+  <?!= include('styles') ?>
 </head>
 
 <body>
 
-<script>
+  
 
-window.busyDates = JSON.parse('<?= busyDatesJson ?>');
+  <!-- 🧩 Интерфейс бронирования (всё содержимое формы) -->
+  <?!= include('steps') ?>
 
-window.config = JSON.parse('<?= configJson ?>');
-
-window.optionsArr = JSON.parse('<?= optionsJson ?>');
-
-window.includedItems= JSON.parse('<?= includedJson ?>');
-
+  <!-- 📦 Скрипты: сначала логика -->
+  <?!= include('plan') ?>
+  <?!= include('scripts') ?>
+  <?!= include('calendar') ?>
+  <?!= include('guests') ?>
+  <?!= include('daybyday') ?>
+  <?!= include('form') ?>
+  <?!= include('upload') ?>
+  <!-- 📊 Передаём JSON-данные из server-side -->
+  <script>
+    window.busyDates      = JSON.parse('<?= busyDatesJson ?>');
+    window.config         = JSON.parse('<?= configJson ?>');
+    window.optionsArr     = JSON.parse('<?= optionsJson ?>');
+    window.includedItems  = JSON.parse('<?= includedJson ?>');
+    
+  </script>
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(() => {
+      window.initClientUI();
+    }, 50); // Ждём завершения вставки через include()
+  });
 </script>
-
-
-
-<!-- 3) steps LAST, references to choosePlan etc. are safe now. -->
-
-<?!= include('steps') ?>
-<script>
-  // Дождёмся полной загрузки DOM и только потом вызовем choosePlan
-  setTimeout(() => {
-    if (window.choosePlan) {
-      window.choosePlan(window.myPlan || 'custom');
-    }
-  }, 100);
-</script>
-
 </body>
-
 </html>

@@ -1,308 +1,243 @@
-<style>
+<script>
+// ================== CALENDAR ==================
 
-body {
+// Отрисовка календаря
+function renderCalendar() {
+  const cal = document.getElementById('calendar');
+  if (!cal) return;
+  cal.innerHTML = '';
 
-font-family: sans-serif;
+  // === Навигация по месяцам ===
+  const nav = document.createElement('div');
+  nav.style.display = 'flex';
+  nav.style.justifyContent = 'space-between';
+  nav.style.alignItems = 'center';
+  nav.style.marginBottom = '0.5rem';
 
-max-width: 700px;
+  const btnPrev = document.createElement('button');
+  btnPrev.textContent = '←Пред';
+  btnPrev.onclick = prevMonth;
+  btnPrev.disabled = isAtMin();
+  nav.appendChild(btnPrev);
 
-margin: auto;
+  const currentDate = new Date(currentYear, currentMonth, 1, 12);
+  const label = currentDate.toLocaleString('ru-RU', { month: 'long', year: 'numeric' });
+  const spanTitle = document.createElement('span');
+  spanTitle.textContent = label;
+  spanTitle.style.fontWeight = 'bold';
+  nav.appendChild(spanTitle);
 
-background:#f9f9f9;
+  const btnNext = document.createElement('button');
+  btnNext.textContent = 'След→';
+  btnNext.onclick = nextMonth;
+  btnNext.disabled = isAtMax();
+  nav.appendChild(btnNext);
 
-padding:1rem;
+  cal.appendChild(nav);
 
+  // === Заголовки дней недели ===
+  const dayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+  const headerRow = document.createElement('div');
+  headerRow.className = 'calendar-header';
+  dayNames.forEach(dn => {
+    const hd = document.createElement('div');
+    hd.className = 'cal-header-cell';
+    hd.textContent = dn;
+    headerRow.appendChild(hd);
+  });
+  cal.appendChild(headerRow);
+
+  // === Сетка календаря ===
+  const grid = document.createElement('div');
+  grid.className = 'calendar-grid';
+  cal.appendChild(grid);
+
+  // Отступ в начале месяца
+  const firstDay = new Date(currentYear, currentMonth, 1).getDay();
+  const offset = (firstDay === 0 ? 6 : firstDay - 1);
+  for (let i = 0; i < offset; i++) {
+    const empty = document.createElement('div');
+    empty.className = 'cal-cell empty';
+    grid.appendChild(empty);
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
+
+  // Дни месяца
+  for (let d = 1; d <= daysInMonth; d++) {
+    const cell = document.createElement('div');
+    cell.className = 'cal-cell';
+
+    const dayDate = new Date(currentYear, currentMonth, d, 12);
+    const ds = dayDate.toISOString().split('T')[0];
+
+    // Номер дня
+    const numDiv = document.createElement('div');
+    numDiv.className = 'cal-daynum';
+    numDiv.textContent = d;
+
+    // Стоимость
+    const priceDiv = document.createElement('div');
+    priceDiv.className = 'cal-price';
+
+    let base = null;
+
+    // Только если дата не занята и не прошла
+    if (dayDate >= today && !window.busyDates.includes(ds)) {
+      const wd = dayDate.getDay();
+      if ([1, 2, 3, 4].includes(wd)) base = window.config.weekday_price || 0;
+      else if (wd === 5) base = window.config.friday_price || 0;
+      else if (wd === 6) base = window.config.saturday_price || 0;
+      else base = window.config.sunday_price || 0;
+
+      // Корректировка под выбранный план
+      if (window.myPlan === 'max') {
+        base += 100;
+      } else if (window.myPlan === 'custom') {
+        base -= (window.config.custom_discount || 0);
+        window.customSelected?.forEach(id => {
+          const op = window.optionsArr.find(x => x.id === id);
+          if (op && !op.isExtra) base += op.price;
+        });
+        if (base < 0) base = 0;
+      }
+    }
+
+    priceDiv.textContent = base !== null ? `${base} р.` : '-';
+
+    // Блокировка занятых / прошедших дат
+    if (dayDate < today || window.busyDates.includes(ds)) {
+      cell.classList.add('busy');
+      cell.style.background = '#ddd';
+      cell.style.color = '#888';
+    } else {
+      cell.addEventListener('click', () => selectDate(ds));
+    }
+
+    if (inRange(ds)) cell.classList.add('selected');
+
+    cell.appendChild(numDiv);
+    cell.appendChild(priceDiv);
+    grid.appendChild(cell);
+  }
 }
 
-.booking-container {
-
-background:#fff;
-
-border-radius:6px;
-
-padding:1rem;
-
-margin-bottom:1rem;
-
+// ========== Месячная навигация ==========
+function prevMonth() {
+  if (isAtMin()) return;
+  currentMonth--;
+  if (currentMonth < 0) {
+    currentMonth = 11;
+    currentYear--;
+  }
+  renderCalendar();
 }
 
-.error {
-
-color:red;
-
-font-weight:bold;
-
+function nextMonth() {
+  if (isAtMax()) return;
+  currentMonth++;
+  if (currentMonth > 11) {
+    currentMonth = 0;
+    currentYear++;
+  }
+  renderCalendar();
 }
 
-.option-card {
-
-background:#fafafa;
-
-border:1px solid #ccc;
-
-border-radius:6px;
-
-padding:10px;
-
-margin:5px 0;
-
+function isAtMin() {
+  return currentYear < minYear || (currentYear === minYear && currentMonth <= minMonth);
 }
 
-#priceDetails {
-
-margin-top:1rem;
-
-font-weight:bold;
-
+function isAtMax() {
+  return currentYear > maxYear || (currentYear === maxYear && currentMonth >= maxMonth);
 }
 
-.included-block {
+// ========== Выделение диапазона дат ==========
 
-background:#f0f8ff;
-
-padding:10px;
-
-border-radius:6px;
-
-margin:0.5rem 0;
-
+function inRange(ds) {
+  if (window.selectedDates.length === 0) return false;
+  if (window.selectedDates.length === 1) return ds === window.selectedDates[0];
+  const [start, end] = window.selectedDates;
+  return ds >= start && ds <= end;
 }
 
-.included-text {
+function selectDate(ds) {
+  if (window.selectedDates.length === 2) {
+    window.selectedDates = [];
+  } else if (window.selectedDates.length === 1 && window.selectedDates[0] === ds) {
+    window.selectedDates = [];
+    updateRangeText();
+    renderCalendar();
+    showCalendarPriceInfo();
+    return;
+  }
 
-font-weight:bold;
+  window.selectedDates.push(ds);
+  window.selectedDates.sort();
 
-margin-bottom:0.5rem;
+  const proceedBtn = document.getElementById('proceedBtn');
+  const errorDiv = document.getElementById('dateError');
 
+  if (window.selectedDates.length === 2) {
+    const [start, end] = window.selectedDates;
+    if (!checkRange(start, end)) {
+      errorDiv.style.display = 'block';
+      errorDiv.textContent = 'В диапазоне есть занятые/прошедшие даты!';
+      window.selectedDates = [];
+      proceedBtn.disabled = true;
+    } else {
+      errorDiv.style.display = 'none';
+      proceedBtn.disabled = false;
+    }
+  } else {
+    errorDiv.style.display = 'none';
+    proceedBtn.disabled = false;
+  }
+
+  updateRangeText();
+  renderCalendar();
+  showCalendarPriceInfo();
 }
 
-#result {
+// Проверка, что все даты между двумя — свободны и не прошли
+function checkRange(start, end) {
+  const cIn = new Date(start + 'T12:00:00');
+  const cOut = new Date(end + 'T12:00:00');
+  const today = new Date(); today.setHours(0, 0, 0, 0);
 
-margin-top:1rem;
-
-color:green;
-
-font-weight:bold;
-
+  while (cIn < cOut) {
+    const ds = cIn.toISOString().split('T')[0];
+    if (window.busyDates.includes(ds) || cIn < today) return false;
+    cIn.setDate(cIn.getDate() + 1);
+  }
+  return true;
 }
 
-.btn-group {
+// Отображение выбранного диапазона в тексте
+function updateRangeText() {
+  const rng = document.getElementById('selectedRange');
+  if (!rng) return;
 
-display:inline-flex;
+  const formatDate = ds => {
+    const d = new Date(ds + 'T12:00:00');
+    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+  };
 
-align-items:center;
-
-margin-left:0.5rem;
-
-margin-bottom:0.5rem;
-
+  if (window.selectedDates.length === 1) {
+    const checkin = formatDate(window.selectedDates[0]);
+    const checkoutDate = new Date(window.selectedDates[0] + 'T12:00:00');
+    checkoutDate.setDate(checkoutDate.getDate() + 1);
+    const checkout = checkoutDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+    rng.textContent = `Вы выбрали ${checkin}: заезд в 15:00, выезд ${checkout} в 12:00`;
+  } else if (window.selectedDates.length === 2) {
+    const checkin = formatDate(window.selectedDates[0]);
+    const checkoutDate = new Date(window.selectedDates[1] + 'T12:00:00');
+    checkoutDate.setDate(checkoutDate.getDate() + 1);
+    const checkout = checkoutDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+    rng.textContent = `Вы выбрали с ${checkin} до ${checkout}`;
+  } else {
+    rng.textContent = '';
+  }
 }
-
-.btn-group button {
-
-width:30px;
-
-height:30px;
-
-font-weight:bold;
-
-}
-
-.btn-group span {
-
-display:inline-block;
-
-width:30px;
-
-text-align:center;
-
-}
-
-#loader {
-
-display:none;
-
-font-weight:bold;
-
-color:blue;
-
-margin-top:0.3rem;
-
-}
-
-
-
-/* Календарь */
-
-.calendar-header {
-
-display:grid;
-
-grid-template-columns: repeat(7,1fr);
-
-margin-bottom:5px;
-
-}
-
-.cal-header-cell {
-
-text-align:center;
-
-font-weight:bold;
-
-}
-
-.calendar-grid {
-
-display:grid;
-
-grid-template-columns: repeat(7,1fr);
-
-gap:5px;
-
-}
-
-.cal-cell {
-
-background:#eee;
-
-border-radius:4px;
-
-text-align:center;
-
-cursor:pointer;
-
-padding:2px;
-
-}
-
-.cal-cell.empty {
-
-background:transparent;
-
-cursor:auto;
-
-}
-
-.cal-cell.busy {
-
-background:#ccc;
-
-color:#999;
-
-pointer-events:none;
-
-}
-
-.cal-cell.selected {
-
-background:#ffeeba;
-
-border:1px solid #ffc107;
-
-}
-
-.cal-daynum {
-
-font-weight:bold;
-
-font-size:1em;
-
-}
-
-.cal-price {
-
-font-size:0.8em;
-
-color:#666;
-
-}
-
-
-
-/* Пакеты */
-
-.plan-cards {
-
-display:flex;
-
-flex-wrap:wrap;
-
-gap:20px;
-
-margin:1rem 0;
-
-}
-
-.plan-card {
-
-background:#fff;
-
-border:2px solid #ccc;
-
-border-radius:8px;
-
-padding:1rem;
-
-width:250px;
-
-cursor:pointer;
-
-}
-
-.plan-card:hover {
-
-border-color:#999;
-
-}
-
-.plan-card-title {
-
-font-weight:bold;
-
-font-size:1.1rem;
-
-margin-bottom:0.5rem;
-
-}
-.custom-option-btn {
-  margin: 4px;
-  padding: 6px 10px;
-  border: 1px solid #999;
-  border-radius: 6px;
-  background: #eee;
-  cursor: pointer;
-}
-
-.custom-option-btn.selected {
-  background: #cce5ff;
-  border-color: #007bff;
-  font-weight: bold;
-}
-.step-progress {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-  font-weight: bold;
-  background: #f0f0f0;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.step {
-  flex: 1;
-  text-align: center;
-  padding: 8px;
-  color: #666;
-  border-bottom: 3px solid transparent;
-  transition: 0.3s;
-}
-
-.step.active {
-  color: #000;
-  border-color: #007bff;
-  background: #e8f0ff;
-}
-
-
-</style>
+</script>

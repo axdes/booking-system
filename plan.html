@@ -1,308 +1,303 @@
-<style>
+<script>
+// ============ CHOOSE PLAN + RENDER BASE =============
 
-body {
 
-font-family: sans-serif;
 
-max-width: 700px;
+window.choosePlan = function (format) {
+  window.myPlan = format;
+  const planText = {
+    max: '✅ Баня, ✅ Чан, ✅ Веник, ✅ SUP (2), ✅ Лодка',
+    relax: '✅ Баня, ✅ Чан, ✅ Веник',
+    custom: 'Выберите нужные опции вручную ниже',
+  };
+  const descEl = document.getElementById('planDescription');
+  if (descEl) descEl.textContent = planText[format] || '';
 
-margin: auto;
+  window.customSelected = [];
 
-background:#f9f9f9;
+  const customEl = document.getElementById('customOptions');
+  const btns = document.getElementById('customBaseButtons');
 
-padding:1rem;
+  if (!customEl || !btns) {
+    console.warn('[choosePlan] customOptions или customBaseButtons не готовы');
+    return;
+  }
 
-}
+  if (format === 'custom') {
+    customEl.style.display = 'block';
+    renderCustomBaseButtons();
+  } else {
+    customEl.style.display = 'none';
+  }
 
-.booking-container {
+  renderCalendar();
 
-background:#fff;
+  const incl = document.getElementById('includedBlock');
+  const manual = document.getElementById('manualBlock');
+  if (!incl || !manual) return;
 
-border-radius:6px;
+  if (format === 'max' || format === 'relax') {
+    incl.style.display = 'block';
+    manual.style.display = 'none';
+    renderIncludedBlock(format);
+  } else {
+    incl.style.display = 'none';
+    manual.style.display = 'block';
+  }
+};
 
-padding:1rem;
 
-margin-bottom:1rem;
 
-}
 
-.error {
+function renderIncludedBlock(plan){
 
-color:red;
+const cont= document.getElementById('includedList');
 
-font-weight:bold;
+if(!cont) return;
 
-}
+cont.innerHTML='';
 
-.option-card {
+if(plan==='max'){
 
-background:#fafafa;
+// все базовые
 
-border:1px solid #ccc;
+window.includedItems.forEach(id=>{
 
-border-radius:6px;
+let op=window.optionsArr.find(x=> x.id===id);
 
-padding:10px;
+if(op){
 
-margin:5px 0;
-
-}
-
-#priceDetails {
-
-margin-top:1rem;
-
-font-weight:bold;
-
-}
-
-.included-block {
-
-background:#f0f8ff;
-
-padding:10px;
-
-border-radius:6px;
-
-margin:0.5rem 0;
-
-}
-
-.included-text {
-
-font-weight:bold;
-
-margin-bottom:0.5rem;
+cont.innerHTML+= `✅ ${op.title}<br>`;
 
 }
 
-#result {
-
-margin-top:1rem;
-
-color:green;
-
-font-weight:bold;
+});
 
 }
 
-.btn-group {
+else if(plan==='relax'){
 
-display:inline-flex;
+// banya/chan/bath_broom
 
-align-items:center;
+['banya', 'chan', 'bath_broom', 'firewood_brazier', 'firewood_bowl'].forEach(id=>{
 
-margin-left:0.5rem;
+let op= window.optionsArr.find(x=> x.id===id);
 
-margin-bottom:0.5rem;
+if(op){
 
-}
-
-.btn-group button {
-
-width:30px;
-
-height:30px;
-
-font-weight:bold;
+cont.innerHTML+= `✅ ${op.title}<br>`;
 
 }
 
-.btn-group span {
-
-display:inline-block;
-
-width:30px;
-
-text-align:center;
+});
 
 }
-
-#loader {
-
-display:none;
-
-font-weight:bold;
-
-color:blue;
-
-margin-top:0.3rem;
 
 }
 
 
 
-/* Календарь */
+function renderManualBase(){
 
-.calendar-header {
+const baseDiv=document.getElementById('manualBase');
 
-display:grid;
+if(!baseDiv)return;
 
-grid-template-columns: repeat(7,1fr);
+baseDiv.innerHTML='';
 
-margin-bottom:5px;
+let baseOps= window.optionsArr.filter(o=> o.baseIncluded && !o.isExtra);
 
-}
+baseOps.forEach(o=>{
 
-.cal-header-cell {
+let card= document.createElement('div');
 
-text-align:center;
+card.className='option-card';
 
-font-weight:bold;
+card.innerHTML=`
 
-}
+<label>
 
-.calendar-grid {
+<input type="checkbox" name="option" value="${o.id}">
 
-display:grid;
+<strong>${o.title}</strong> (${o.price} р.)
 
-grid-template-columns: repeat(7,1fr);
+</label>
 
-gap:5px;
+`;
 
-}
+baseDiv.appendChild(card);
 
-.cal-cell {
-
-background:#eee;
-
-border-radius:4px;
-
-text-align:center;
-
-cursor:pointer;
-
-padding:2px;
-
-}
-
-.cal-cell.empty {
-
-background:transparent;
-
-cursor:auto;
-
-}
-
-.cal-cell.busy {
-
-background:#ccc;
-
-color:#999;
-
-pointer-events:none;
-
-}
-
-.cal-cell.selected {
-
-background:#ffeeba;
-
-border:1px solid #ffc107;
-
-}
-
-.cal-daynum {
-
-font-weight:bold;
-
-font-size:1em;
-
-}
-
-.cal-price {
-
-font-size:0.8em;
-
-color:#666;
+});
 
 }
 
 
 
-/* Пакеты */
+function renderExtraOptions(){
 
-.plan-cards {
+let ex=document.getElementById('extraBlock');
 
-display:flex;
+if(!ex) return;
 
-flex-wrap:wrap;
+ex.innerHTML='';
 
-gap:20px;
 
-margin:1rem 0;
+
+let divServ= document.createElement('div');
+
+divServ.innerHTML='<h4>Доп. услуги</h4>';
+
+ex.appendChild(divServ);
+
+
+
+let divFood= document.createElement('div');
+
+divFood.innerHTML='<h4>Питание</h4>';
+
+ex.appendChild(divFood);
+
+
+
+let extras= window.optionsArr.filter(o=> o.isExtra && !['breakfast','lunch','dinner'].includes(o.id));
+
+extras.forEach(o=>{
+
+let card=document.createElement('div');
+
+card.className='option-card';
+
+card.innerHTML=`
+
+<label>
+
+<input type="checkbox" name="option" value="${o.id}">
+
+<strong>${o.title}</strong> (${o.price} р.)
+
+</label>
+
+`;
+
+divServ.appendChild(card);
+
+});
+
+
+
+let food= window.optionsArr.filter(o=> ['breakfast','lunch','dinner'].includes(o.id));
+
+food.forEach(o=>{
+
+let card=document.createElement('div');
+
+card.className='option-card';
+
+card.innerHTML=`
+
+<label>
+
+<input type="checkbox" name="option" value="${o.id}">
+
+<strong>${o.title}</strong> (${o.price} р.)
+
+</label>
+
+`;
+
+divFood.appendChild(card);
+
+});
 
 }
+// ============ CUSTOM PLAN BASE OPTIONS ============
+// Отображение кнопок с базовыми опциями при выборе CUSTOM
 
-.plan-card {
+window.customSelected = []; // ID выбранных вручную базовых опций
 
-background:#fff;
+function renderCustomBaseButtons() {
+  const cont = document.getElementById('customBaseButtons');
+  if (!cont) return;
+  cont.innerHTML = '';
 
-border:2px solid #ccc;
+  // Фильтруем только базовые опции, не extra
+  const baseOptions = window.optionsArr.filter(op => op.baseIncluded && !op.isExtra);
 
-border-radius:8px;
-
-padding:1rem;
-
-width:250px;
-
-cursor:pointer;
-
+  baseOptions.forEach(op => {
+    const btn = document.createElement('button');
+    btn.textContent = op.title + ` (${op.price} р.)`;
+    btn.className = 'custom-option-btn';
+    btn.onclick = () => toggleCustomOption(op.id, btn);
+    cont.appendChild(btn);
+  });
 }
 
-.plan-card:hover {
+// Переключение выбора базовой опции
+function toggleCustomOption(id, btn) {
+  const idx = window.customSelected.indexOf(id);
+  if (idx === -1) {
+    window.customSelected.push(id);
+    btn.classList.add('selected');
+  } else {
+    window.customSelected.splice(idx, 1);
+    btn.classList.remove('selected');
+  }
 
-border-color:#999;
-
+  renderCalendar(); // Обновляем календарь с новой ценой
 }
+window.safeChoosePlan = function (format) {
+  const retry = () => {
+    const el1 = document.getElementById('customOptions');
+    const el2 = document.getElementById('customBaseButtons');
+    if (el1 && el2 && typeof window.choosePlan === 'function') {
+      window.choosePlan(format);
+    } else {
+      console.warn('[choosePlan] DOM ещё не готов. Повторим через 50мс');
+      setTimeout(retry, 50);
+    }
+  };
+  retry();
+};
 
-.plan-card-title {
-
-font-weight:bold;
-
-font-size:1.1rem;
-
-margin-bottom:0.5rem;
-
+document.addEventListener('DOMContentLoaded', () => {
+  const cards = document.querySelectorAll('.plan-card');
+  cards.forEach(card => {
+    card.addEventListener('click', () => {
+      const plan = card.getAttribute('data-plan');
+      window.safeChoosePlan(plan); // вызываем безопасно
+    });
+  });
+});
+window.initClientUI = function () {
+  renderCalendar();
+  renderManualBase();
+  renderExtraOptions();
+  bindPlanClickEvents();
+  waitForElement('planDescription', () => {
+    window.safeChoosePlan(window.myPlan || 'custom');
+  });
+};
+function waitForElement(id, callback, attempts = 20) {
+  const el = document.getElementById(id);
+  if (el) return callback(el);
+  if (attempts <= 0) return console.warn(`[waitForElement] ${id} не найден`);
+  setTimeout(() => waitForElement(id, callback, attempts - 1), 50);
 }
-.custom-option-btn {
-  margin: 4px;
-  padding: 6px 10px;
-  border: 1px solid #999;
-  border-radius: 6px;
-  background: #eee;
-  cursor: pointer;
+function bindPlanClickEvents() {
+  const cards = document.querySelectorAll('.plan-card');
+  cards.forEach(card => {
+    card.addEventListener('click', () => {
+      const plan = card.getAttribute('data-plan');
+      window.safeChoosePlan(plan);
+    });
+  });
 }
-
-.custom-option-btn.selected {
-  background: #cce5ff;
-  border-color: #007bff;
-  font-weight: bold;
+function showBlock(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'block';
 }
-.step-progress {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 1rem;
-  font-weight: bold;
-  background: #f0f0f0;
-  border-radius: 6px;
-  overflow: hidden;
+function hideBlock(id) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none';
 }
-
-.step {
-  flex: 1;
-  text-align: center;
-  padding: 8px;
-  color: #666;
-  border-bottom: 3px solid transparent;
-  transition: 0.3s;
-}
-
-.step.active {
-  color: #000;
-  border-color: #007bff;
-  background: #e8f0ff;
-}
-
-
-</style>
+  </script>

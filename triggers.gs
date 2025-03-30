@@ -1,69 +1,63 @@
-function createReminders(data){
+// Создаёт напоминания: за 7 дней, за 1 день до заезда и 1 день после выезда
+function createReminders(data) {
+  const checkin = new Date(data.checkin);
+  const offsets = [7, 1, -1]; // Кол-во дней до (или после) заезда
 
-const cIn=new Date(data.checkin);
+  offsets.forEach(offset => {
+    const reminderDate = new Date(checkin);
+    reminderDate.setDate(reminderDate.getDate() - offset);
 
-const offsets=[7,1,-1];
+    // Не создаём напоминания, если дата уже в прошлом
+    if (reminderDate <= new Date()) return;
 
-offsets.forEach(off=>{
+    const key = Utilities.formatDate(reminderDate, Session.getScriptTimeZone(), 'yyyy-MM-dd') +
+                '_' + data.email + '_' + offset;
 
-const dd=new Date(cIn);
+    const message = offset > 0
+      ? `До заезда осталось ${offset} дней!`
+      : 'Спасибо за отдых! Надеемся, вам всё понравилось.';
 
-dd.setDate(dd.getDate()-off);
+    // Сохраняем напоминание в Properties
+    PropertiesService.getScriptProperties().setProperty(
+      key,
+      JSON.stringify({
+        email: data.email,
+        name: data.name,
+        message
+      })
+    );
 
-if(dd<=new Date())return;
-
-
-
-const key=Utilities.formatDate(dd,Session.getScriptTimeZone(),'yyyy-MM-dd')+'_'+ data.email+'_'+off;
-
-PropertiesService.getScriptProperties().setProperty(key, JSON.stringify({
-
-email:data.email,
-
-name:data.name,
-
-message:(off>0? `До заезда осталось ${off} дней!`:'Спасибо за отдых!')
-
-}));
-
-try{
-
-ScriptApp.newTrigger('sendReminder')
-
-.timeBased()
-
-.at(dd)
-
-.create();
-
-}catch(e){}
-
-});
-
+    // Создаём триггер отправки на нужную дату
+    try {
+      ScriptApp.newTrigger('sendReminder')
+        .timeBased()
+        .at(reminderDate)
+        .create();
+    } catch (e) {
+      console.error('Ошибка создания триггера:', e);
+    }
+  });
 }
 
+// Отправляет напоминания, если сегодня наступила дата одного из них
+function sendReminder() {
+  const now = new Date();
+  const today = Utilities.formatDate(now, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const props = PropertiesService.getScriptProperties().getProperties();
 
-
-function sendReminder(){
-
-const now=new Date();
-
-const today=Utilities.formatDate(now,Session.getScriptTimeZone(),'yyyy-MM-dd');
-
-const props= PropertiesService.getScriptProperties().getProperties();
-
-for(let k in props){
-
-if(k.startsWith(today)){
-
-const info= JSON.parse(props[k]);
-
-MailApp.sendEmail(info.email,'Напоминание',`Здравствуйте, ${info.name}!\n${info.message}`);
-
-PropertiesService.getScriptProperties().deleteProperty(k);
-
-}
-
-}
-
+  Object.keys(props).forEach(key => {
+    if (key.startsWith(today)) {
+      try {
+        const info = JSON.parse(props[key]);
+        MailApp.sendEmail(
+          info.email,
+          'Напоминание о бронировании Kvetka House',
+          `Здравствуйте, ${info.name}!\n\n${info.message}\n\nХорошего дня!\nКоманда Kvetka`
+        );
+        PropertiesService.getScriptProperties().deleteProperty(key);
+      } catch (e) {
+        console.error(`Ошибка отправки напоминания для ключа ${key}:`, e);
+      }
+    }
+  });
 }

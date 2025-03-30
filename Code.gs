@@ -1,208 +1,135 @@
-const SPREADSHEET_ID = '1z3sqKwmXBWfcdCNmT_vyJMLF2oVfVXqMxdth_7PpcNk'; // <-- ВАШ ID
-
+const SPREADSHEET_ID = '1z3sqKwmXBWfcdCNmT_vyJMLF2oVfVXqMxdth_7PpcNk';
 const ANSWERS_SHEET = 'Answers';
-
-const RECEIPT_FOLDER_ID= '1qCi4kN6Vjs8G6Hx_i92wSnZ-WzjLEAtQ'; // <-- ВАШ ID
-
+const RECEIPT_FOLDER_ID = '1qCi4kN6Vjs8G6Hx_i92wSnZ-WzjLEAtQ';
 const CALENDAR_ID = 'kvetka.trusovichi@gmail.com';
 
-
-
+// Главная точка входа — отображение HTML-формы
 function doGet() {
+  const tpl = HtmlService.createTemplateFromFile('index');
 
-const tpl = HtmlService.createTemplateFromFile('index');
+  tpl.busyDatesJson = JSON.stringify(listBookings());
+  tpl.configJson = JSON.stringify(getFullConfig());
+  tpl.optionsJson = JSON.stringify(getOptions());
+  tpl.includedJson = JSON.stringify(getIncludedItems());
 
-// Передаем JSON-данные в index.html
-
-tpl.busyDatesJson = JSON.stringify(listBookings());
-
-tpl.configJson = JSON.stringify(getFullConfig());
-
-tpl.optionsJson = JSON.stringify(getOptions());
-
-tpl.includedJson = JSON.stringify(getIncludedItems());
-
-return tpl.evaluate().setTitle('Kvetka Booking');
-
-
+  return tpl.evaluate().setTitle('Kvetka Booking');
 }
 
-
-
+// Вставка HTML-фрагментов
 function include(filename) {
-
-return HtmlService.createHtmlOutputFromFile(filename).getContent();
-
+  return HtmlService.createHtmlOutputFromFile(filename).getContent();
 }
 
-
-
-// Собираем все занятые даты (каждый день) из таблицы
-
+// Получение всех занятых дат из таблицы бронирований
 function listBookings() {
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(ANSWERS_SHEET);
+  if (!sheet) return [];
 
-const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(ANSWERS_SHEET);
+  const data = sheet.getDataRange().getValues().slice(1); // Без заголовка
+  const dates = [];
 
-if(!sheet)return [];
+  data.forEach(row => {
+    const [ , , cInRaw, cOutRaw ] = row; // Индексы B и C
+    if (!cInRaw || !cOutRaw) return;
 
-const data= sheet.getDataRange().getValues().slice(1);
+    const checkin = new Date(cInRaw);
+    const checkout = new Date(cOutRaw);
+    if (isNaN(checkin) || isNaN(checkout)) return;
 
-const arr= [];
+    const day = new Date(checkin);
+    while (day < checkout) {
+      const dateStr = Utilities.formatDate(day, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+      dates.push(dateStr);
+      day.setDate(day.getDate() + 1);
+    }
+  });
 
-data.forEach(row=>{
-
-const cInRaw=row[2], cOutRaw=row[3];
-
-if(!cInRaw||!cOutRaw)return;
-
-const cIn= new Date(cInRaw), cOut= new Date(cOutRaw);
-
-if(isNaN(cIn)||isNaN(cOut))return;
-
-const d= new Date(cIn);
-
-while(d< cOut){
-
-arr.push( Utilities.formatDate(d, Session.getScriptTimeZone(), 'yyyy-MM-dd') );
-
-d.setDate(d.getDate()+1);
-
+  return dates;
 }
 
-});
+// Добавление новой брони
+function addReservation(formData) {
+  const sheet = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(ANSWERS_SHEET);
+  if (!sheet) throw new Error('Answers sheet not found!');
 
-return arr;
+  const breakdownStr = JSON.stringify(formData.breakdown || {});
+  const daySelectionsStr = JSON.stringify(formData.daySelections || []);
+// === УЧИТЫВАЕМ ВТОРОЙ ДОМИК ===
+if (formData.includeSecondHouse) {
+  formData.fullCost += 150;
+  if (!formData.breakdown.total) formData.breakdown.total = 0;
+  formData.breakdown.total += 150;
 
+  if (!formData.breakdown.lines) formData.breakdown.lines = [];
+  formData.breakdown.lines.push({ label: 'Второй домик', cost: 150 });
+}
+  sheet.appendRow([
+    new Date(),                       // A: Timestamp
+    formData.email || '',             // B
+    new Date(formData.checkin),       // C
+    new Date(formData.checkout),      // D
+    formData.name || '',              // E
+    formData.phone || '',             // F
+    formData.adults || 0,             // G
+    formData.kids || 0,               // H
+    formData.babies || 0,             // I
+    formData.babyBed ? 'Yes' : 'No',  // J
+    formData.pets || 0,               // K
+    formData.format || '',            // L
+    daySelectionsStr,                 // M: JSON
+    formData.comment || '',           // N
+    formData.receiptFileUrl || '',    // O
+    formData.fullCost || 0,           // P
+    formData.prepayment || 0,         // Q
+    'ожидание',                       // R: статус
+    breakdownStr,                      // S: JSON
+    formData.includeSecondHouse ? 'да' : 'нет' // или true/false
+
+  ]);
+
+  // Уведомления
+  const msg = `Новая бронь: ${formData.name} (${formData.email}), ${formData.checkin}–${formData.checkout}, итого ${formData.fullCost} BYN`;
+  sendTelegramNotification(msg);
+  createCalendarEvent(formData);
+  createReminders(formData);
+
+  return 'Спасибо! Ваша бронь сохранена.';
 }
 
+// Сохраняем загруженный чек в Google Drive и возвращаем ссылку
+function saveFile(obj) {
+  const folder = DriveApp.getFolderById(RECEIPT_FOLDER_ID);
+  const blob = Utilities.newBlob(
+    Utilities.base64Decode(obj.data),
+    obj.mimeType,
+    obj.fileName
+  );
 
-
-function addReservation(formData){
-
-const sheet= SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(ANSWERS_SHEET);
-
-if(!sheet) throw new Error('Answers sheet not found!');
-
-
-
-const breakdownStr= JSON.stringify(formData.breakdown||{});
-
-const daySelectionsStr= JSON.stringify(formData.daySelections||[]);
-
-
-
-sheet.appendRow([
-
-new Date(), // timestamp
-
-formData.email||'', // B
-
-new Date(formData.checkin), // C
-
-new Date(formData.checkout), // D
-
-formData.name||'', // E
-
-formData.phone||'', // F
-
-formData.adults||0, // G
-
-formData.kids||0, // H
-
-formData.babies||0, // I
-
-(formData.babyBed?'Yes':'No'), // J
-
-formData.pets||0, // K
-
-formData.format||'', // L
-
-daySelectionsStr, // M (JSON)
-
-formData.comment||'', // N
-
-formData.receiptFileUrl||'', // O
-
-formData.fullCost||0, // P
-
-formData.prepayment||0, // Q
-
-'ожидание', // R
-
-breakdownStr // S
-
-]);
-
-
-
-// Telegram
-
-const msg= `Новая бронь: ${formData.name} (${formData.email}), ${formData.checkin}–${formData.checkout}, итого ${formData.fullCost} BYN`;
-
-sendTelegramNotification(msg);
-
-
-
-createCalendarEvent(formData);
-
-createReminders(formData);
-
-
-
-return 'Спасибо! Ваша бронь сохранена.';
-
+  const file = folder.createFile(blob);
+  return file.getUrl();
 }
 
+// Создание события в календаре
+function createCalendarEvent(formData) {
+  const calendar = CalendarApp.getCalendarById(CALENDAR_ID);
+  if (!calendar) return;
 
+  const config = getFullConfig();
+  const checkin = new Date(formData.checkin);
+  const checkout = new Date(formData.checkout);
 
-function saveFile(obj){
+  const [inH = 15, inM = 0] = (config.checkin_time || '15:00').split(':').map(Number);
+  const [outH = 12, outM = 0] = (config.checkout_time || '12:00').split(':').map(Number);
 
-const folder= DriveApp.getFolderById(RECEIPT_FOLDER_ID);
+  checkin.setHours(inH, inM);
+  checkout.setHours(outH, outM);
 
-const blob= Utilities.newBlob(
-
-Utilities.base64Decode(obj.data),
-
-obj.mimeType,
-
-obj.fileName
-
-);
-
-const file= folder.createFile(blob);
-
-return file.getUrl();
-
-}
-
-
-
-function createCalendarEvent(formData){
-
-const cal= CalendarApp.getCalendarById(CALENDAR_ID);
-
-if(!cal)return;
-
-const cfg= getFullConfig();
-
-const cIn= new Date(formData.checkin);
-
-const cOut= new Date(formData.checkout);
-
-let inParts= (cfg.checkin_time||'15:00').split(':');
-
-cIn.setHours(+inParts[0], +inParts[1]);
-
-let outParts= (cfg.checkout_time||'12:00').split(':');
-
-cOut.setHours(+outParts[0], +outParts[1]);
-
-
-
-cal.createEvent(`Бронь: ${formData.name}`, cIn,cOut,{
-
-description: `${formData.email}, ${formData.phone}\nИтого: ${formData.fullCost}`
-
-});
-
+  calendar.createEvent(
+    `Бронь: ${formData.name}`,
+    checkin,
+    checkout,
+    {
+      description: `${formData.email}, ${formData.phone}\nИтого: ${formData.fullCost}`
+    }
+  );
 }

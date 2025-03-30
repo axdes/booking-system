@@ -9,15 +9,12 @@
 </div>
 <h3>Выберите план</h3>
 <div class="plan-cards">
-  <div class="plan-card" onclick="choosePlan('max')">
-    <div class="plan-card-title">MAX</div>
-    <p>+100 р. за ночь, все базовые опции бесплатно</p>
-  </div>
-  <div class="plan-card" onclick="choosePlan('relax')">
+  
+  <div class="plan-card" data-plan="relax">
     <div class="plan-card-title">RELAX</div>
     <p>Базовая цена, баня/чан/веник бесплатно</p>
   </div>
-  <div class="plan-card" onclick="choosePlan('custom')">
+  <div class="plan-card" data-plan="custom">
     <div class="plan-card-title">CUSTOM</div>
     <p>-200 р. за ночь, выберите нужные опции вручную</p>
   </div>
@@ -66,7 +63,21 @@
 </div>
 <label><input type="checkbox" id="babyBed"> Кроватка?</label>
 <br>
+<!-- Информационный текст о лимите -->
+<p id="guestInfo" class="info-text" style="margin-top: 0.5em;">
+  Дом рассчитан на 4 гостей (взрослые + дети) и одного младенца в кроватке.
+  <br>
+  Можно добавить второй домик (+2 места) за 150 р.
+</p>
 
+<!-- Блок второго домика -->
+<div id="secondHouseOffer" style="display:none; margin-top: 10px; background: #f9f9f9; padding: 10px; border: 1px solid #ddd;">
+  <p>🏡 Основной дом рассчитан максимум на 4 человек (включая детей). Хотите добавить второй домик для ещё 2 гостей за 150 BYN?</p>
+  <label>
+    <input type="checkbox" id="secondHouseToggle" onchange="toggleSecondHouse(this.checked)">
+    Добавить второй домик
+  </label>
+</div>
 <label>Животные:</label>
 <div class="btn-group">
   <button onclick="decrease('pets')">-</button>
