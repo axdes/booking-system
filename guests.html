@@ -1,33 +1,122 @@
-<script>
-function decrease(type) {
-  if (type === 'adults' && window.adultCount > 1) {
-    window.adultCount--;
-    document.getElementById('adultsCount').textContent = window.adultCount;
-  } else if (type === 'kids' && window.kidCount > 0) {
-    window.kidCount--;
-    document.getElementById('kidsCount').textContent = window.kidCount;
-  } else if (type === 'babies' && window.babyCount > 0) {
-    window.babyCount--;
-    document.getElementById('babiesCount').textContent = window.babyCount;
-  } else if (type === 'pets' && window.petCount > 0) {
-    window.petCount--;
-    document.getElementById('petsCount').textContent = window.petCount;
-  }
-}
+<!-- Шаг 1 -->
 
-function increase(type) {
-  if (type === 'adults' && window.adultCount < 4) {
-    window.adultCount++;
-    document.getElementById('adultsCount').textContent = window.adultCount;
-  } else if (type === 'kids') {
-    window.kidCount++;
-    document.getElementById('kidsCount').textContent = window.kidCount;
-  } else if (type === 'babies' && window.babyCount < 1) {
-    window.babyCount++;
-    document.getElementById('babiesCount').textContent = window.babyCount;
-  } else if (type === 'pets' && window.petCount < 2) {
-    window.petCount++;
-    document.getElementById('petsCount').textContent = window.petCount;
-  }
-}
-</script>
+<div class="booking-container" id="calendarBlock">
+<!-- Визуальный прогресс -->
+<div id="stepProgress" class="step-progress">
+  <div class="step" id="step1">1. План и даты</div>
+  <div class="step" id="step2">2. Опции по дням</div>
+  <div class="step" id="step3">3. Контакты</div>
+</div>
+<h3>Выберите план</h3>
+<div class="plan-cards">
+  <div class="plan-card" onclick="choosePlan('max')">
+    <div class="plan-card-title">MAX</div>
+    <p>+100 р. за ночь, все базовые опции бесплатно</p>
+  </div>
+  <div class="plan-card" onclick="choosePlan('relax')">
+    <div class="plan-card-title">RELAX</div>
+    <p>Базовая цена, баня/чан/веник бесплатно</p>
+  </div>
+  <div class="plan-card" onclick="choosePlan('custom')">
+    <div class="plan-card-title">CUSTOM</div>
+    <p>-200 р. за ночь, выберите нужные опции вручную</p>
+  </div>
+</div>
+
+<div id="planDescription" style="margin:0.5rem 0; font-weight:bold;"></div>
+
+<!-- Показ базовых опций кнопками для CUSTOM -->
+<div id="customOptions" style="display:none">
+  <p>Выберите базовые опции:</p>
+  <div id="customBaseButtons" class="option-buttons"></div>
+</div>
+<div id="calendarPriceInfo" class="calendar-price-info" style="display:none;"></div>
+
+<h3>Выберите даты</h3>
+<div id="calendar"></div>
+<div id="selectedRange"></div>
+<div id="dateError" class="error" style="display:none"></div>
+
+<h4>Дополнительные опции</h4>
+<div id="extraBlock"></div>
+
+<h3>Состав гостей</h3>
+
+<label>Взрослые:</label>
+<div class="btn-group">
+  <button onclick="decrease('adults')">-</button>
+  <span id="adultsCount">2</span>
+  <button onclick="increase('adults')">+</button>
+</div>
+<br>
+
+<label>Дети (3..10):</label>
+<div class="btn-group">
+  <button onclick="decrease('kids')">-</button>
+  <span id="kidsCount">0</span>
+  <button onclick="increase('kids')">+</button>
+</div>
+<br>
+
+<label>Младенцы (0..2):</label>
+<div class="btn-group">
+  <button onclick="decrease('babies')">-</button>
+  <span id="babiesCount">0</span>
+  <button onclick="increase('babies')">+</button>
+</div>
+<label><input type="checkbox" id="babyBed"> Кроватка?</label>
+<br>
+
+<label>Животные:</label>
+<div class="btn-group">
+  <button onclick="decrease('pets')">-</button>
+  <span id="petsCount">0</span>
+  <button onclick="increase('pets')">+</button>
+</div>
+
+<div id="priceDetails"></div>
+<button id="proceedBtn" onclick="decideNextStep()" disabled>Далее</button>
+
+</div>
+
+
+
+<!-- Шаг 2: day-by-day -->
+<div class="booking-container" id="dayByDayBlock" style="display:none">
+<h3>Выберите опции по каждому дню</h3>
+<button onclick="goBackToCalendar()">Назад</button>
+<table id="dayTable" border="1"></table>
+<div id="dailyPriceResult"></div>
+<button onclick="goToFinalStep()">Далее</button>
+</div>
+
+
+
+
+<!-- Шаг 3: contacts + check -->
+<div class="booking-container" id="contactForm" style="display:none">
+
+<h3>Контакты</h3>
+<label>Имя:</label>
+<input type="text" id="name"><br><br>
+
+<label>Email:</label>
+<input type="email" id="email"><br><br>
+
+<label>Телефон:</label>
+<input type="tel" id="phone"><br><br>
+
+<label>Комментарий:</label>
+<textarea id="comment"></textarea><br><br>
+
+<div>
+  <label>Загрузите чек:</label>
+  <input type="file" id="receipt">
+  <button onclick="uploadReceipt()">Загрузить</button>
+  <div id="loader" style="display:none">Загрузка...</div>
+</div>
+<div id="result"></div>
+
+<div id="finalPrice"></div>
+<button onclick="submitBookingDayByDay()">Подтвердить бронь</button>
+</div>

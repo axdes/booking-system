@@ -1,19 +1,1387 @@
 <script>
-  function waitForElementAndInit(selector, callback) {
-    const el = document.querySelector(selector);
-    if (el) {
-      callback();
-    } else {
-      setTimeout(() => waitForElementAndInit(selector, callback), 50);
+
+// -- GLOBALS --
+
+window.busyDates = window.busyDates || [];
+
+window.config = window.config || {};
+
+window.optionsArr = window.optionsArr || [];
+
+window.includedItems= window.includedItems|| [];
+
+window.adultCount=2;
+
+window.kidCount=0;
+
+window.babyCount=0;
+
+window.petCount=0;
+
+window.selectedDates=[];
+
+window.uploadedReceiptUrl='';
+
+
+
+window.myPlan='custom';
+
+
+
+let currentYear, currentMonth;
+
+let minYear, minMonth;
+
+let maxYear, maxMonth;
+
+
+
+window.addEventListener('DOMContentLoaded', function() {
+  // Вся инициализация ТОЛЬКО здесь:
+  const now = new Date();
+  minYear = now.getFullYear();
+  minMonth = now.getMonth();
+  const tmp = new Date(minYear, minMonth + 2, 1);
+  maxYear = tmp.getFullYear();
+  maxMonth = tmp.getMonth();
+
+  currentYear = minYear;
+  currentMonth = minMonth;
+
+  renderCalendar();
+  renderManualBase();
+  renderExtraOptions();
+  updateProgress(1);
+});
+
+
+
+
+// ================== CALENDAR ==================
+
+function renderCalendar(){
+
+const cal=document.getElementById('calendar');
+
+if(!cal)return;
+
+cal.innerHTML='';
+
+
+
+const nav=document.createElement('div');
+
+nav.style.display='flex';
+
+nav.style.justifyContent='space-between';
+
+nav.style.alignItems='center';
+
+nav.style.marginBottom='0.5rem';
+
+
+
+const btnPrev=document.createElement('button');
+
+btnPrev.textContent='←Пред';
+
+btnPrev.onclick=prevMonth;
+
+if(isAtMin()) btnPrev.disabled=true;
+
+nav.appendChild(btnPrev);
+
+
+
+const dateObj=new Date(currentYear,currentMonth,1,12,0,0);
+
+const label=dateObj.toLocaleString('ru-RU',{month:'long', year:'numeric'});
+
+const spanTitle=document.createElement('span');
+
+spanTitle.textContent= label;
+
+spanTitle.style.fontWeight='bold';
+
+nav.appendChild(spanTitle);
+
+
+
+const btnNext=document.createElement('button');
+
+btnNext.textContent='След→';
+
+btnNext.onclick=nextMonth;
+
+if(isAtMax()) btnNext.disabled=true;
+
+nav.appendChild(btnNext);
+
+
+
+cal.appendChild(nav);
+
+
+
+const dayNames=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+
+const headerRow=document.createElement('div');
+
+headerRow.className='calendar-header';
+
+dayNames.forEach(dn=>{
+
+const hd=document.createElement('div');
+
+hd.className='cal-header-cell';
+
+hd.textContent=dn;
+
+headerRow.appendChild(hd);
+
+});
+
+cal.appendChild(headerRow);
+
+
+
+const grid=document.createElement('div');
+
+grid.className='calendar-grid';
+
+cal.appendChild(grid);
+
+
+
+let firstDay=new Date(currentYear,currentMonth,1).getDay();
+
+let offset=(firstDay===0?6:(firstDay-1));
+
+for(let i=0;i<offset;i++){
+
+const empty=document.createElement('div');
+
+empty.className='cal-cell empty';
+
+grid.appendChild(empty);
+
+}
+
+
+
+const todayMid=new Date();
+
+todayMid.setHours(0,0,0,0);
+
+const daysInMonth=new Date(currentYear,currentMonth+1,0).getDate();
+
+
+
+for(let d=1; d<=daysInMonth; d++){
+
+const cell=document.createElement('div');
+
+cell.className='cal-cell';
+
+
+
+const dayDate=new Date(currentYear,currentMonth,d,12,0,0);
+
+const ds= dayDate.toISOString().split('T')[0];
+
+
+
+const numDiv=document.createElement('div');
+
+numDiv.className='cal-daynum';
+
+numDiv.textContent=d;
+
+
+
+const priceDiv=document.createElement('div');
+
+priceDiv.className='cal-price';
+
+
+
+let base=null;
+
+if(dayDate>=todayMid && !window.busyDates.includes(ds)){
+
+let wd= dayDate.getDay();
+
+if([1,2,3,4].includes(wd)){
+
+base= window.config.weekday_price||0;
+
+} else if(wd===5){
+
+base= window.config.friday_price||0;
+
+} else if(wd===6){
+
+base= window.config.saturday_price||0;
+
+} else {
+
+base= window.config.sunday_price||0;
+
+}
+
+if(window.myPlan==='max'){
+  base += 100;
+} else if(window.myPlan==='custom'){
+  base -= (window.config.custom_discount || 0);
+
+  // Добавляем цену всех выбранных базовых опций (customSelected)
+  window.customSelected.forEach(id => {
+    const op = window.optionsArr.find(x => x.id === id);
+    if (op && !op.isExtra) {
+      base += op.price;
     }
+  });
+
+  if(base < 0) base = 0;
+}
+
+
+}
+
+priceDiv.textContent= (base!==null)? (base+' р.'): '-';
+
+
+
+if(dayDate<todayMid || window.busyDates.includes(ds)){
+
+cell.classList.add('busy');
+
+cell.style.background='#ddd';
+
+cell.style.color='#888';
+
+} else {
+
+cell.addEventListener('click', ()=>selectDate(ds));
+
+}
+
+if(inRange(ds)){
+
+cell.classList.add('selected');
+
+}
+
+
+
+cell.appendChild(numDiv);
+
+cell.appendChild(priceDiv);
+
+grid.appendChild(cell);
+
+}
+
+}
+
+
+
+function prevMonth(){
+
+if(isAtMin())return;
+
+currentMonth--;
+
+if(currentMonth<0){
+
+currentMonth=11;
+
+currentYear--;
+
+}
+
+renderCalendar();
+
+}
+
+function nextMonth(){
+
+if(isAtMax())return;
+
+currentMonth++;
+
+if(currentMonth>11){
+
+currentMonth=0;
+
+currentYear++;
+
+}
+
+renderCalendar();
+
+}
+
+function isAtMin(){
+
+return (currentYear<minYear)||(currentYear===minYear && currentMonth<=minMonth);
+
+}
+
+function isAtMax(){
+
+return (currentYear>maxYear)||(currentYear===maxYear && currentMonth>=maxMonth);
+
+}
+
+function inRange(ds){
+
+if(window.selectedDates.length<1)return false;
+
+if(window.selectedDates.length===1)return ds===window.selectedDates[0];
+
+const [s,e]= window.selectedDates;
+
+return (ds>=s && ds<= e);
+
+}
+
+
+
+function selectDate(ds){
+
+if(window.selectedDates.length===2){
+
+window.selectedDates=[];
+
+}
+
+else if(window.selectedDates.length===1){
+
+if(window.selectedDates[0]===ds){
+
+window.selectedDates=[];
+
+updateRangeText();
+
+renderCalendar();
+showCalendarPriceInfo();
+return;
+
+}
+
+}
+
+window.selectedDates.push(ds);
+
+window.selectedDates.sort();
+
+
+
+if(window.selectedDates.length===2){
+
+if(!checkRange(window.selectedDates[0], window.selectedDates[1])){
+
+document.getElementById('dateError').style.display='block';
+
+document.getElementById('dateError').textContent='В диапазоне есть занятые/прошедшие даты!';
+
+window.selectedDates=[];
+
+document.getElementById('proceedBtn').disabled=true;
+
+} else {
+
+document.getElementById('dateError').style.display='none';
+
+document.getElementById('proceedBtn').disabled=false;
+
+}
+
+} else {
+
+document.getElementById('dateError').style.display='none';
+
+document.getElementById('proceedBtn').disabled=false;
+
+}
+
+updateRangeText();
+
+renderCalendar();
+
+}
+
+
+
+function checkRange(start,end){
+
+let cIn=new Date(start+'T12:00:00');
+
+let cOut=new Date(end+'T12:00:00');
+
+const todayMid=new Date(); todayMid.setHours(0,0,0,0);
+
+
+
+while(cIn< cOut){
+
+let ds=cIn.toISOString().split('T')[0];
+
+if(window.busyDates.includes(ds))return false;
+
+if(cIn<todayMid)return false;
+
+cIn.setDate(cIn.getDate()+1);
+
+}
+
+return true;
+
+}
+
+
+
+function updateRangeText(){
+  const rng = document.getElementById('selectedRange');
+  if (!rng) return;
+
+  const formatDate = (ds) => {
+    const d = new Date(ds + 'T12:00:00');
+    return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+  };
+
+  if (window.selectedDates.length === 1) {
+    const checkin = formatDate(window.selectedDates[0]);
+    const checkoutDate = new Date(window.selectedDates[0] + 'T12:00:00');
+    checkoutDate.setDate(checkoutDate.getDate() + 1);
+    const checkout = checkoutDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+
+    rng.textContent = `Вы выбрали ${checkin}: заезд в 15:00, выезд ${checkout} в 12:00`;
+  } else if (window.selectedDates.length === 2) {
+    const checkin = formatDate(window.selectedDates[0]);
+    const checkoutDate = new Date(window.selectedDates[1] + 'T12:00:00');
+    checkoutDate.setDate(checkoutDate.getDate() + 1);
+    const checkout = checkoutDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+
+    rng.textContent = `Вы выбрали с ${checkin} до ${checkout}`;
+  } else {
+    rng.textContent = '';
+  }
+}
+
+
+
+
+// ============ CHOOSE PLAN + RENDER BASE =============
+
+
+
+window.choosePlan=function(fmt){
+
+window.myPlan=fmt;
+
+// Обновляем описание под планом
+const planText = {
+  max: '✅ Баня, ✅ Чан, ✅ Веник, ✅ SUP (2), ✅ Лодка',
+  relax: '✅ Баня, ✅ Чан, ✅ Веник',
+  custom: 'Выберите нужные опции вручную ниже',
+};
+document.getElementById('planDescription').textContent = planText[fmt] || '';
+
+// Сброс выбора custom опций
+window.customSelected = [];
+
+const customEl = document.getElementById('customOptions');
+const customBtnContainer = document.getElementById('customBaseButtons');
+
+if (!customEl || !customBtnContainer) {
+  console.warn('❗ choosePlan прерван — DOM ещё не готов');
+  return;
+}
+
+
+if (customEl && customBtnContainer) {
+  if (fmt === 'custom') {
+    customEl.style.display = 'block';
+    renderCustomBaseButtons();
+  } else {
+    customEl.style.display = 'none';
+  }
+} else {
+  console.warn('customOptions или customBaseButtons ещё не загружены');
+}
+
+
+
+
+renderCalendar();
+
+if(fmt==='max'){
+
+document.getElementById('includedBlock').style.display='block';
+
+document.getElementById('manualBlock').style.display='none';
+
+renderIncludedBlock('max');
+
+}
+
+else if(fmt==='relax'){
+
+document.getElementById('includedBlock').style.display='block';
+
+document.getElementById('manualBlock').style.display='none';
+
+renderIncludedBlock('relax');
+
+}
+
+else{
+
+document.getElementById('includedBlock').style.display='none';
+
+document.getElementById('manualBlock').style.display='block';
+
+}
+
+};
+
+
+
+function renderIncludedBlock(plan){
+
+const cont= document.getElementById('includedList');
+
+if(!cont) return;
+
+cont.innerHTML='';
+
+if(plan==='max'){
+
+// все базовые
+
+window.includedItems.forEach(id=>{
+
+let op=window.optionsArr.find(x=> x.id===id);
+
+if(op){
+
+cont.innerHTML+= `✅ ${op.title}<br>`;
+
+}
+
+});
+
+}
+
+else if(plan==='relax'){
+
+// banya/chan/bath_broom
+
+['banya', 'chan', 'bath_broom', 'firewood_brazier', 'firewood_bowl'].forEach(id=>{
+
+let op= window.optionsArr.find(x=> x.id===id);
+
+if(op){
+
+cont.innerHTML+= `✅ ${op.title}<br>`;
+
+}
+
+});
+
+}
+
+}
+
+
+
+function renderManualBase(){
+
+const baseDiv=document.getElementById('manualBase');
+
+if(!baseDiv)return;
+
+baseDiv.innerHTML='';
+
+let baseOps= window.optionsArr.filter(o=> o.baseIncluded && !o.isExtra);
+
+baseOps.forEach(o=>{
+
+let card= document.createElement('div');
+
+card.className='option-card';
+
+card.innerHTML=`
+
+<label>
+
+<input type="checkbox" name="option" value="${o.id}">
+
+<strong>${o.title}</strong> (${o.price} р.)
+
+</label>
+
+`;
+
+baseDiv.appendChild(card);
+
+});
+
+}
+
+
+
+function renderExtraOptions(){
+
+let ex=document.getElementById('extraBlock');
+
+if(!ex) return;
+
+ex.innerHTML='';
+
+
+
+let divServ= document.createElement('div');
+
+divServ.innerHTML='<h4>Доп. услуги</h4>';
+
+ex.appendChild(divServ);
+
+
+
+let divFood= document.createElement('div');
+
+divFood.innerHTML='<h4>Питание</h4>';
+
+ex.appendChild(divFood);
+
+
+
+let extras= window.optionsArr.filter(o=> o.isExtra && !['breakfast','lunch','dinner'].includes(o.id));
+
+extras.forEach(o=>{
+
+let card=document.createElement('div');
+
+card.className='option-card';
+
+card.innerHTML=`
+
+<label>
+
+<input type="checkbox" name="option" value="${o.id}">
+
+<strong>${o.title}</strong> (${o.price} р.)
+
+</label>
+
+`;
+
+divServ.appendChild(card);
+
+});
+
+
+
+let food= window.optionsArr.filter(o=> ['breakfast','lunch','dinner'].includes(o.id));
+
+food.forEach(o=>{
+
+let card=document.createElement('div');
+
+card.className='option-card';
+
+card.innerHTML=`
+
+<label>
+
+<input type="checkbox" name="option" value="${o.id}">
+
+<strong>${o.title}</strong> (${o.price} р.)
+
+</label>
+
+`;
+
+divFood.appendChild(card);
+
+});
+
+}
+
+
+
+// ============ GUESTS =============
+
+function decrease(type){
+
+if(type==='adults'){
+
+if(window.adultCount>1){
+
+window.adultCount--;
+
+document.getElementById('adultsCount').textContent=window.adultCount;
+
+}
+
+} else if(type==='kids'){
+
+if(window.kidCount>0){
+
+window.kidCount--;
+
+document.getElementById('kidsCount').textContent=window.kidCount;
+
+}
+
+} else if(type==='babies'){
+
+if(window.babyCount>0){
+
+window.babyCount--;
+
+document.getElementById('babiesCount').textContent=window.babyCount;
+
+}
+
+} else if(type==='pets'){
+
+if(window.petCount>0){
+
+window.petCount--;
+
+document.getElementById('petsCount').textContent=window.petCount;
+
+}
+
+}
+
+}
+
+
+
+function increase(type){
+
+if(type==='adults'){
+
+if(window.adultCount<4){
+
+window.adultCount++;
+
+document.getElementById('adultsCount').textContent=window.adultCount;
+
+}
+
+} else if(type==='kids'){
+
+window.kidCount++;
+
+document.getElementById('kidsCount').textContent=window.kidCount;
+
+} else if(type==='babies'){
+
+if(window.babyCount<1){
+
+window.babyCount++;
+
+document.getElementById('babiesCount').textContent=window.babyCount;
+
+}
+
+} else if(type==='pets'){
+
+if(window.petCount<2){
+
+window.petCount++;
+
+document.getElementById('petsCount').textContent=window.petCount;
+
+}
+
+}
+
+}
+
+
+
+// No advanced price calc on step1
+
+// but "decideNextStep"
+
+function decideNextStep(){
+
+let chosen= collectStep1Options();
+
+if(window.myPlan==='custom'){
+
+if(chosen.length===0){
+
+// skip daybyday
+
+goToFinalStep();
+
+} else {
+
+goToDayByDay();
+
+}
+
+} else {
+
+// plan= max or relax => ignore banya/chan/bath_broom
+
+let realChosen= chosen.filter(id=> !['banya','chan','bath_broom'].includes(id));
+
+if(realChosen.length===0){
+
+goToFinalStep();
+
+} else {
+
+goToDayByDay();
+
+}
+
+}
+
+}
+
+
+
+// collect step1 checked
+
+function collectStep1Options(){
+
+let chosen=[];
+
+if(window.myPlan==='custom'){
+
+let baseDiv= document.getElementById('manualBase');
+
+if(baseDiv){
+
+let c= baseDiv.querySelectorAll('input[type=checkbox]:checked');
+
+c.forEach(ch=> chosen.push(ch.value));
+
+}
+
+}
+
+let ex=document.getElementById('extraBlock');
+
+if(ex){
+
+let c= ex.querySelectorAll('input[type=checkbox]:checked');
+
+c.forEach(ch=> chosen.push(ch.value));
+
+}
+
+return chosen;
+
+}
+
+
+
+// ============ step2 daybyday =============
+
+function goToDayByDay(){
+
+document.getElementById('calendarBlock').style.display='none';
+
+document.getElementById('dayByDayBlock').style.display='block';
+
+buildDayTable();
+
+autoCalculateDayByDay();
+updateProgress(2);
+
+}
+
+function goBackToCalendar(){
+
+document.getElementById('dayByDayBlock').style.display='none';
+
+document.getElementById('calendarBlock').style.display='block';
+updateProgress(1);
+
+}
+
+
+
+function buildDayTable(){
+   let dayTable= document.getElementById('dayTable');
+   dayTable.innerHTML='';
+   if(window.selectedDates.length<2){
+     dayTable.innerHTML='<tr><td>Нужно выбрать не менее 2 дат</td></tr>';
+     return;
+   }
+   let start=new Date(window.selectedDates[0]+'T12:00:00');
+   let end=  new Date(window.selectedDates[1]+'T12:00:00');
+   let rows=[];
+   let currentDate = new Date(start); // Создаем копию начальной даты
+
+   while(currentDate <= end){
+     rows.push( currentDate.toISOString().split('T')[0] );
+     currentDate.setDate(currentDate.getDate()+1);
+   }
+
+   // Смотрим, что выбрано
+   let chosenStep1= collectStep1Options();
+   // plan=custom => все chosen
+   // plan=max/relax => exclude banya/chan/bath_broom
+   let relevant=[];
+   if(window.myPlan==='custom'){
+     relevant= chosenStep1;  // всё
+   } else {
+     relevant= chosenStep1.filter(id=> !['banya','chan','bath_broom'].includes(id));
+   }
+
+   if(relevant.length===0){
+     dayTable.innerHTML='<tr><td>Нет опций, требующих распределения по дням</td></tr>';
+     return;
+   }
+
+   let thead=document.createElement('thead');
+   let htr=document.createElement('tr');
+   let thDate=document.createElement('th');
+   thDate.textContent='Дата';
+   htr.appendChild(thDate);
+   relevant.forEach(id=>{
+     let op= window.optionsArr.find(x=> x.id===id);
+     let th= document.createElement('th');
+     th.textContent= op? op.title : id;
+     htr.appendChild(th);
+   });
+   thead.appendChild(htr);
+   dayTable.appendChild(thead);
+
+   let tbody=document.createElement('tbody');
+   rows.forEach(ds=>{
+     let tr= document.createElement('tr');
+    let tdDate = document.createElement('td');
+const dObj = new Date(ds + 'T12:00:00');
+const options = { day: 'numeric', month: 'long', weekday: 'short' };
+tdDate.textContent = dObj.toLocaleDateString('ru-RU', options);
+tr.appendChild(tdDate);
+
+     relevant.forEach(id=>{
+       let op= window.optionsArr.find(x=> x.id===id);
+       let td=document.createElement('td');
+       td.innerHTML= `<input type="checkbox" data-day="${ds}" data-opt="${id}" onchange="autoCalculateDayByDay()">`;
+       tr.appendChild(td);
+     });
+
+     tbody.appendChild(tr);
+   });
+   dayTable.appendChild(tbody);
+ }
+
+
+
+function autoCalculateDayByDay(){
+
+let checks= document.querySelectorAll('#dayTable input[type=checkbox]:checked');
+
+let dayMap={};
+
+checks.forEach(ch=>{
+
+let ds= ch.getAttribute('data-day');
+
+let opt= ch.getAttribute('data-opt');
+
+if(!dayMap[ds]) dayMap[ds]=[];
+
+dayMap[ds].push(opt);
+
+});
+
+let daySelections=[];
+
+let trs=document.querySelectorAll('#dayTable tbody tr');
+
+trs.forEach(tr=>{
+
+let ds= tr.cells[0].textContent.trim();
+
+if(ds){
+
+daySelections.push({ date:ds, chosen:(dayMap[ds]||[]) });
+
+}
+
+});
+
+
+
+google.script.run
+
+.withSuccessHandler(br=>{
+
+let html=`<p><b>Итого:</b> ${br.total} р.</p>`;
+
+br.lines.forEach(line=>{
+
+html+= `<p>${line.label}: <b>${line.cost}</b></p>`;
+
+});
+
+document.getElementById('dailyPriceResult').innerHTML=html;
+
+
+
+let fDiv=document.getElementById('finalPrice');
+
+if(fDiv){
+
+fDiv.innerHTML=html;
+
+}
+
+})
+
+.withFailureHandler(err=>{
+
+document.getElementById('dailyPriceResult').innerHTML='Ошибка:'+ err.message;
+
+let fDiv=document.getElementById('finalPrice');
+
+if(fDiv){
+
+fDiv.innerHTML='Ошибка:'+ err.message;
+
+}
+
+})
+
+.getCostBreakdownDaily(
+
+window.myPlan,
+
+daySelections,
+
+window.adultCount,
+
+window.kidCount,
+
+window.babyCount,
+
+document.getElementById('babyBed').checked,
+
+window.petCount
+
+);
+
+}
+
+
+
+function goToFinalStep(){
+
+document.getElementById('dayByDayBlock').style.display='none';
+
+document.getElementById('contactForm').style.display='block';
+
+autoCalculateDayByDay();
+updateProgress(3);
+
+}
+
+
+
+// ========== STEP 3 (contacts) + SUBMIT ==========
+
+
+
+function submitBookingDayByDay(){
+
+let checks= document.querySelectorAll('#dayTable input[type=checkbox]:checked');
+
+let dayMap={};
+
+checks.forEach(ch=>{
+
+let ds= ch.getAttribute('data-day');
+
+let opt= ch.getAttribute('data-opt');
+
+if(!dayMap[ds]) dayMap[ds]=[];
+
+dayMap[ds].push(opt);
+
+});
+
+let daySelections=[];
+
+let trs=document.querySelectorAll('#dayTable tbody tr');
+
+trs.forEach(tr=>{
+
+let ds= tr.cells[0].textContent.trim();
+
+if(ds){
+
+daySelections.push({ date:ds, chosen: dayMap[ds]||[] });
+
+}
+
+});
+
+
+
+google.script.run
+
+.withSuccessHandler(br=>{
+
+const prepayment= Math.floor(br.total*0.3);
+
+const left= br.total - prepayment;
+
+const formData={
+
+checkin:(window.selectedDates[0]||''),
+
+checkout:(window.selectedDates[1]||''),
+
+name: document.getElementById('name').value||'',
+
+email:document.getElementById('email').value||'',
+
+phone:document.getElementById('phone').value||'',
+
+comment:document.getElementById('comment').value||'',
+
+format: window.myPlan,
+
+daySelections,
+
+adults: window.adultCount,
+
+kids: window.kidCount,
+
+babies: window.babyCount,
+
+babyBed: document.getElementById('babyBed').checked,
+
+pets: window.petCount,
+
+fullCost: br.total,
+
+prepayment,
+
+breakdown: br,
+
+receiptFileUrl: window.uploadedReceiptUrl
+
+};
+
+
+
+google.script.run
+
+.withSuccessHandler(msg=>{
+
+document.getElementById('result').textContent= msg;
+
+})
+
+.withFailureHandler(err=>{
+
+document.getElementById('result').textContent='Ошибка:'+ err.message;
+
+})
+
+.addReservation(formData);
+
+
+
+})
+
+.withFailureHandler(err=>{
+
+document.getElementById('result').textContent='Ошибка:'+ err.message;
+
+})
+
+.getCostBreakdownDaily(
+
+window.myPlan,
+
+daySelections,
+
+window.adultCount,
+
+window.kidCount,
+
+window.babyCount,
+
+document.getElementById('babyBed').checked,
+
+window.petCount
+
+);
+
+}
+
+
+
+// ========== UTILS ===========
+
+
+
+function uploadReceipt(){
+
+const fileInput=document.getElementById('receipt');
+
+if(!fileInput.files||!fileInput.files.length){
+
+alert('Выберите файл!');
+
+return;
+
+}
+
+document.getElementById('loader').style.display='inline';
+
+const file= fileInput.files[0];
+
+const reader= new FileReader();
+
+reader.onload= function(e){
+
+const [meta, base64]= e.target.result.split(',');
+
+const mimeType= meta.match(/:(.*?);/)[1];
+
+
+
+google.script.run
+
+.withSuccessHandler(url=>{
+
+window.uploadedReceiptUrl= url;
+
+document.getElementById('loader').style.display='none';
+
+document.getElementById('result').textContent='Чек загружен.';
+
+})
+
+.withFailureHandler(err=>{
+
+document.getElementById('loader').style.display='none';
+
+document.getElementById('result').textContent='Ошибка:'+ err.message;
+
+})
+
+.saveFile({
+
+fileName:file.name,
+
+mimeType,
+
+data: base64
+
+});
+
+};
+
+reader.readAsDataURL(file);
+
+}
+// ============ CUSTOM PLAN BASE OPTIONS ============
+
+window.customSelected = []; // выбранные вручную базовые опции
+
+function renderCustomBaseButtons() {
+  const cont = document.getElementById('customBaseButtons');
+  if (!cont) return;
+  cont.innerHTML = '';
+
+  const baseOptions = window.optionsArr.filter(op => op.baseIncluded && !op.isExtra);
+  baseOptions.forEach(op => {
+    const btn = document.createElement('button');
+    btn.textContent = op.title + ` (${op.price} р.)`;
+    btn.className = 'custom-option-btn';
+    btn.onclick = () => toggleCustomOption(op.id, btn);
+    cont.appendChild(btn);
+  });
+}
+
+function toggleCustomOption(id, btn) {
+  const idx = window.customSelected.indexOf(id);
+  if (idx === -1) {
+    window.customSelected.push(id);
+    btn.classList.add('selected');
+  } else {
+    window.customSelected.splice(idx, 1);
+    btn.classList.remove('selected');
+  }
+  renderCalendar(); // обновляем цены
+}
+function waitForElementAndInit(selector, callback) {
+  const el = document.querySelector(selector);
+  if (el) {
+    callback();
+  } else {
+    setTimeout(() => waitForElementAndInit(selector, callback), 50);
+  }
+}
+
+function updateProgress(step) {
+  ['step1', 'step2', 'step3'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.remove('active');
+  });
+  const activeEl = document.getElementById(`step${step}`);
+  if (activeEl) activeEl.classList.add('active');
+}
+
+function showCalendarPriceInfo() {
+  const infoDiv = document.getElementById('calendarPriceInfo');
+  if (!infoDiv || window.selectedDates.length === 0) {
+    infoDiv.style.display = 'none';
+    return;
   }
 
-  function updateProgress(step) {
-    ['step1', 'step2', 'step3'].forEach(id => {
-      const el = document.getElementById(id);
-      if (el) el.classList.remove('active');
-    });
-    const activeEl = document.getElementById(`step${step}`);
-    if (activeEl) activeEl.classList.add('active');
+  // Подсчёт дней
+  let start = new Date(window.selectedDates[0] + 'T12:00:00');
+  let end = new Date(window.selectedDates[1] || window.selectedDates[0] + 'T12:00:00');
+  let days = Math.max(1, Math.ceil((end - start) / (1000 * 60 * 60 * 24)));
+
+  let total = 0;
+  for (let i = 0; i < days; i++) {
+    let d = new Date(start);
+    d.setDate(start.getDate() + i);
+    const wd = d.getDay();
+    let base = 0;
+    if ([1,2,3,4].includes(wd)) base = window.config.weekday_price || 0;
+    else if (wd === 5) base = window.config.friday_price || 0;
+    else if (wd === 6) base = window.config.saturday_price || 0;
+    else base = window.config.sunday_price || 0;
+
+    if (window.myPlan === 'max') base += 100;
+    else if (window.myPlan === 'custom') base -= (window.config.custom_discount || 0);
+
+    if (base < 0) base = 0;
+    total += base;
   }
+
+  const prepayment = Math.round(total * 0.3);
+  let text = `Примерная стоимость: ${total} BYN<br>Предоплата: ${prepayment} BYN (30%)`;
+
+  if (window.myPlan === 'max') {
+    text += `<br><em>Вы экономите до 150 BYN по сравнению с ручным выбором опций</em>`;
+  }
+
+  infoDiv.innerHTML = text;
+  infoDiv.style.display = 'block';
+}
+
 </script>
