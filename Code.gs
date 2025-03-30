@@ -145,8 +145,6 @@ sendTelegramNotification(msg);
 
 createCalendarEvent(formData);
 
-createReminders(formData);
-
 
 
 return 'Спасибо! Ваша бронь сохранена.';
@@ -177,32 +175,19 @@ return file.getUrl();
 
 
 
-function createCalendarEvent(formData){
 
-const cal= CalendarApp.getCalendarById(CALENDAR_ID);
-
-if(!cal)return;
-
-const cfg= getFullConfig();
-
-const cIn= new Date(formData.checkin);
-
-const cOut= new Date(formData.checkout);
-
-let inParts= (cfg.checkin_time||'15:00').split(':');
-
-cIn.setHours(+inParts[0], +inParts[1]);
-
-let outParts= (cfg.checkout_time||'12:00').split(':');
-
-cOut.setHours(+outParts[0], +outParts[1]);
-
-
-
-cal.createEvent(`Бронь: ${formData.name}`, cIn,cOut,{
-
-description: `${formData.email}, ${formData.phone}\nИтого: ${formData.fullCost}`
-
-});
-
+// вместо старой реализации
+function getPreliminaryCost(plan, startDate, endDate) {
+  return getPreliminaryCost(plan, startDate, endDate);
 }
+function getCostBreakdownDaily(plan, daySelections, adults, kids, babies, babyBed, pets) {
+  return getCostBreakdownDaily(plan, daySelections, adults, kids, babies, babyBed, pets);
+}
+function createReminders(formData) {
+  return createReminders(formData);
+}
+
+function sendEmailConfirmation(formData) {
+  return sendEmailConfirmation(formData);
+}
+

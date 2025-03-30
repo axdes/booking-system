@@ -1,0 +1,33 @@
+<script>
+function decrease(type) {
+  if (type === 'adults' && window.adultCount > 1) {
+    window.adultCount--;
+    document.getElementById('adultsCount').textContent = window.adultCount;
+  } else if (type === 'kids' && window.kidCount > 0) {
+    window.kidCount--;
+    document.getElementById('kidsCount').textContent = window.kidCount;
+  } else if (type === 'babies' && window.babyCount > 0) {
+    window.babyCount--;
+    document.getElementById('babiesCount').textContent = window.babyCount;
+  } else if (type === 'pets' && window.petCount > 0) {
+    window.petCount--;
+    document.getElementById('petsCount').textContent = window.petCount;
+  }
+}
+
+function increase(type) {
+  if (type === 'adults' && window.adultCount < 4) {
+    window.adultCount++;
+    document.getElementById('adultsCount').textContent = window.adultCount;
+  } else if (type === 'kids') {
+    window.kidCount++;
+    document.getElementById('kidsCount').textContent = window.kidCount;
+  } else if (type === 'babies' && window.babyCount < 1) {
+    window.babyCount++;
+    document.getElementById('babiesCount').textContent = window.babyCount;
+  } else if (type === 'pets' && window.petCount < 2) {
+    window.petCount++;
+    document.getElementById('petsCount').textContent = window.petCount;
+  }
+}
+</script>

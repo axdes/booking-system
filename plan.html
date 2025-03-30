@@ -1,0 +1,67 @@
+<script>
+window.choosePlan = function(fmt) {
+  window.myPlan = fmt;
+
+  const planText = {
+    max: '✅ Баня, ✅ Чан, ✅ Веник, ✅ SUP (2), ✅ Лодка',
+    relax: '✅ Баня, ✅ Чан, ✅ Веник',
+    custom: 'Выберите нужные опции вручную ниже',
+  };
+  document.getElementById('planDescription').textContent = planText[fmt] || '';
+
+  // Сброс выбора custom опций
+  window.customSelected = [];
+
+  const customEl = document.getElementById('customOptions');
+  const customBtnContainer = document.getElementById('customBaseButtons');
+
+  if (!customEl || !customBtnContainer) {
+    console.warn('❗ choosePlan прерван — DOM ещё не готов');
+    return;
+  }
+
+  if (fmt === 'custom') {
+    customEl.style.display = 'block';
+    renderCustomBaseButtons();
+  } else {
+    customEl.style.display = 'none';
+  }
+
+  renderCalendar();
+
+  if (fmt === 'max') {
+    document.getElementById('includedBlock').style.display = 'block';
+    document.getElementById('manualBlock').style.display = 'none';
+    renderIncludedBlock('max');
+  } else if (fmt === 'relax') {
+    document.getElementById('includedBlock').style.display = 'block';
+    document.getElementById('manualBlock').style.display = 'none';
+    renderIncludedBlock('relax');
+  } else {
+    document.getElementById('includedBlock').style.display = 'none';
+    document.getElementById('manualBlock').style.display = 'block';
+  }
+};
+
+function renderIncludedBlock(plan) {
+  const cont = document.getElementById('includedList');
+  if (!cont) return;
+  cont.innerHTML = '';
+
+  if (plan === 'max') {
+    window.includedItems.forEach(id => {
+      const op = window.optionsArr.find(x => x.id === id);
+      if (op) {
+        cont.innerHTML += `✅ ${op.title}<br>`;
+      }
+    });
+  } else if (plan === 'relax') {
+    ['banya', 'chan', 'bath_broom', 'firewood_brazier', 'firewood_bowl'].forEach(id => {
+      const op = window.optionsArr.find(x => x.id === id);
+      if (op) {
+        cont.innerHTML += `✅ ${op.title}<br>`;
+      }
+    });
+  }
+}
+</script>

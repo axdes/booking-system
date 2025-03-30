@@ -1,0 +1,35 @@
+<script>
+  window.busyDates = window.busyDates || [];
+  window.config = window.config || {};
+  window.optionsArr = window.optionsArr || [];
+  window.includedItems = window.includedItems || [];
+  window.adultCount = 2;
+  window.kidCount = 0;
+  window.babyCount = 0;
+  window.petCount = 0;
+  window.selectedDates = [];
+  window.uploadedReceiptUrl = '';
+  window.myPlan = 'custom';
+  window.customSelected = [];
+
+  let currentYear, currentMonth;
+  let minYear, minMonth;
+  let maxYear, maxMonth;
+
+  window.addEventListener('DOMContentLoaded', function () {
+    const now = new Date();
+    minYear = now.getFullYear();
+    minMonth = now.getMonth();
+    const tmp = new Date(minYear, minMonth + 2, 1);
+    maxYear = tmp.getFullYear();
+    maxMonth = tmp.getMonth();
+    currentYear = minYear;
+    currentMonth = minMonth;
+console.log('🔥 DOMContentLoaded, начинаем рендеринг');
+
+    renderCalendar();
+    renderManualBase();
+    renderExtraOptions();
+    updateProgress(1);
+  });
+</script>

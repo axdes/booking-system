@@ -14,18 +14,7 @@
 
 <!-- 1) scripts FIRST, to define choosePlan etc. -->
 
-<?!= include('scripts') ?>
-
-
-
-<!-- 2) styles NEXT -->
-
-<?!= include('styles') ?>
-
-</head>
-
-<body>
-
+<!-- Вместо одного большого scripts.html: -->
 <script>
 
 window.busyDates = JSON.parse('<?= busyDatesJson ?>');
@@ -37,20 +26,33 @@ window.optionsArr = JSON.parse('<?= optionsJson ?>');
 window.includedItems= JSON.parse('<?= includedJson ?>');
 
 </script>
+<?!= include('globals') ?>
+<?!= include('calendars') ?>
+<?!= include('plan') ?>
+<?!= include('guests') ?>
+<?!= include('daybyday') ?>
+<?!= include('submit') ?>
+<?!= include('scripts') ?>
+
+
+
+
+<!-- 2) styles NEXT -->
+
+<style><?!= include('styles') ?></style>
+
+</head>
+
+<body>
+
+
 
 
 
 <!-- 3) steps LAST, references to choosePlan etc. are safe now. -->
 
 <?!= include('steps') ?>
-<script>
-  // Дождёмся полной загрузки DOM и только потом вызовем choosePlan
-  setTimeout(() => {
-    if (window.choosePlan) {
-      window.choosePlan(window.myPlan || 'custom');
-    }
-  }, 100);
-</script>
+
 
 </body>
 

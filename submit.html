@@ -1,0 +1,112 @@
+<script>
+function goToFinalStep() {
+  document.getElementById('dayByDayBlock').style.display = 'none';
+  document.getElementById('contactForm').style.display = 'block';
+  autoCalculateDayByDay();
+  updateProgress(3);
+}
+
+function submitBookingDayByDay() {
+  const checks = document.querySelectorAll('#dayTable input[type=checkbox]:checked');
+  const dayMap = {};
+  checks.forEach(ch => {
+    const ds = ch.getAttribute('data-day');
+    const opt = ch.getAttribute('data-opt');
+    if (!dayMap[ds]) dayMap[ds] = [];
+    dayMap[ds].push(opt);
+  });
+
+  const daySelections = [];
+  const trs = document.querySelectorAll('#dayTable tbody tr');
+  trs.forEach(tr => {
+    const ds = tr.cells[0].textContent.trim();
+    if (ds) {
+      daySelections.push({ date: ds, chosen: dayMap[ds] || [] });
+    }
+  });
+
+  google.script.run
+    .withSuccessHandler(br => {
+      const prepayment = Math.floor(br.total * 0.3);
+      const formData = {
+        checkin: window.selectedDates[0] || '',
+        checkout: window.selectedDates[1] || '',
+        name: document.getElementById('name').value || '',
+        email: document.getElementById('email').value || '',
+        phone: document.getElementById('phone').value || '',
+        comment: document.getElementById('comment').value || '',
+        format: window.myPlan,
+        daySelections,
+        adults: window.adultCount,
+        kids: window.kidCount,
+        babies: window.babyCount,
+        babyBed: document.getElementById('babyBed').checked,
+        pets: window.petCount,
+        fullCost: br.total,
+        prepayment,
+        breakdown: br,
+        receiptFileUrl: window.uploadedReceiptUrl
+      };
+
+     google.script.run
+  .withSuccessHandler(msg => {
+    showThankYou();
+  })
+
+        .withFailureHandler(err => {
+          document.getElementById('result').textContent = 'Ошибка: ' + err.message;
+        })
+        .addReservation(formData);
+    })
+    .withFailureHandler(err => {
+      document.getElementById('result').textContent = 'Ошибка: ' + err.message;
+    })
+    .getCostBreakdownDaily(
+      window.myPlan,
+      daySelections,
+      window.adultCount,
+      window.kidCount,
+      window.babyCount,
+      document.getElementById('babyBed').checked,
+      window.petCount
+    );
+}
+
+function uploadReceipt() {
+  const fileInput = document.getElementById('receipt');
+  if (!fileInput.files || !fileInput.files.length) {
+    alert('Выберите файл!');
+    return;
+  }
+  document.getElementById('loader').style.display = 'inline';
+  const file = fileInput.files[0];
+  const reader = new FileReader();
+
+  reader.onload = function (e) {
+    const [meta, base64] = e.target.result.split(',');
+    const mimeType = meta.match(/:(.*?);/)[1];
+
+    google.script.run
+      .withSuccessHandler(url => {
+        window.uploadedReceiptUrl = url;
+        document.getElementById('loader').style.display = 'none';
+        document.getElementById('result').textContent = 'Чек загружен.';
+      })
+      .withFailureHandler(err => {
+        document.getElementById('loader').style.display = 'none';
+        document.getElementById('result').textContent = 'Ошибка: ' + err.message;
+      })
+      .saveFile({
+        fileName: file.name,
+        mimeType,
+        data: base64
+      });
+  };
+  reader.readAsDataURL(file);
+}
+function showThankYou() {
+  document.getElementById('contactForm').style.display = 'none';
+  document.getElementById('thankYouBlock').style.display = 'block';
+}
+
+</script>

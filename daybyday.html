@@ -1,0 +1,122 @@
+<script>
+function goToDayByDay() {
+  document.getElementById('calendarBlock').style.display = 'none';
+  document.getElementById('dayByDayBlock').style.display = 'block';
+  buildDayTable();
+  autoCalculateDayByDay();
+  updateProgress(2);
+}
+
+function goBackToCalendar() {
+  document.getElementById('dayByDayBlock').style.display = 'none';
+  document.getElementById('calendarBlock').style.display = 'block';
+  updateProgress(1);
+}
+
+function buildDayTable() {
+  const dayTable = document.getElementById('dayTable');
+  dayTable.innerHTML = '';
+  if (window.selectedDates.length < 2) {
+    dayTable.innerHTML = '<tr><td>Нужно выбрать не менее 2 дат</td></tr>';
+    return;
+  }
+
+  let start = new Date(window.selectedDates[0] + 'T12:00:00');
+  let end = new Date(window.selectedDates[1] + 'T12:00:00');
+  let rows = [];
+  let currentDate = new Date(start);
+  while (currentDate <= end) {
+    rows.push(currentDate.toISOString().split('T')[0]);
+    currentDate.setDate(currentDate.getDate() + 1);
+  }
+
+  let chosenStep1 = collectStep1Options();
+  let relevant = (window.myPlan === 'custom')
+    ? chosenStep1
+    : chosenStep1.filter(id => !['banya', 'chan', 'bath_broom'].includes(id));
+
+  if (relevant.length === 0) {
+    dayTable.innerHTML = '<tr><td>Нет опций, требующих распределения по дням</td></tr>';
+    return;
+  }
+
+  const thead = document.createElement('thead');
+  const htr = document.createElement('tr');
+  const thDate = document.createElement('th');
+  thDate.textContent = 'Дата';
+  htr.appendChild(thDate);
+  relevant.forEach(id => {
+    const op = window.optionsArr.find(x => x.id === id);
+    const th = document.createElement('th');
+    th.textContent = op ? op.title : id;
+    htr.appendChild(th);
+  });
+  thead.appendChild(htr);
+  dayTable.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  rows.forEach(ds => {
+    const tr = document.createElement('tr');
+    const tdDate = document.createElement('td');
+    const dObj = new Date(ds + 'T12:00:00');
+    const options = { day: 'numeric', month: 'long', weekday: 'short' };
+    tdDate.textContent = dObj.toLocaleDateString('ru-RU', options);
+    tr.appendChild(tdDate);
+
+    relevant.forEach(id => {
+      const td = document.createElement('td');
+      td.innerHTML = `<input type="checkbox" data-day="${ds}" data-opt="${id}" onchange="autoCalculateDayByDay()">`;
+      tr.appendChild(td);
+    });
+
+    tbody.appendChild(tr);
+  });
+  dayTable.appendChild(tbody);
+}
+
+function autoCalculateDayByDay() {
+  const checks = document.querySelectorAll('#dayTable input[type=checkbox]:checked');
+  const dayMap = {};
+  checks.forEach(ch => {
+    const ds = ch.getAttribute('data-day');
+    const opt = ch.getAttribute('data-opt');
+    if (!dayMap[ds]) dayMap[ds] = [];
+    dayMap[ds].push(opt);
+  });
+
+  const daySelections = [];
+  const trs = document.querySelectorAll('#dayTable tbody tr');
+  trs.forEach(tr => {
+    const ds = tr.cells[0].textContent.trim();
+    if (ds) {
+      daySelections.push({ date: ds, chosen: dayMap[ds] || [] });
+    }
+  });
+
+  google.script.run
+    .withSuccessHandler(br => {
+      let html = `<p><b>Итого:</b> ${br.total} р.</p>`;
+      br.lines.forEach(line => {
+        html += `<p>${line.label}: <b>${line.cost}</b></p>`;
+      });
+      document.getElementById('dailyPriceResult').innerHTML = html;
+      const fDiv = document.getElementById('finalPrice');
+      if (fDiv) fDiv.innerHTML = html;
+    })
+    .withFailureHandler(err => {
+      const msg = 'Ошибка: ' + err.message;
+      document.getElementById('dailyPriceResult').innerHTML = msg;
+      const fDiv = document.getElementById('finalPrice');
+      if (fDiv) fDiv.innerHTML = msg;
+    })
+    .getCostBreakdownDaily(
+      window.myPlan,
+      daySelections,
+      window.adultCount,
+      window.kidCount,
+      window.babyCount,
+      document.getElementById('babyBed').checked,
+      window.petCount
+    );
+}
+</script>

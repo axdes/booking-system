@@ -1,0 +1,40 @@
+<script>
+function decideNextStep() {
+  const chosen = collectStep1Options();
+
+  if (window.myPlan === 'custom') {
+    if (chosen.length === 0) {
+      goToFinalStep();
+    } else {
+      goToDayByDay();
+    }
+  } else {
+    const realChosen = chosen.filter(id => !['banya', 'chan', 'bath_broom'].includes(id));
+    if (realChosen.length === 0) {
+      goToFinalStep();
+    } else {
+      goToDayByDay();
+    }
+  }
+}
+
+function collectStep1Options() {
+  const chosen = [];
+
+  if (window.myPlan === 'custom') {
+    const baseDiv = document.getElementById('manualBase');
+    if (baseDiv) {
+      const c = baseDiv.querySelectorAll('input[type=checkbox]:checked');
+      c.forEach(ch => chosen.push(ch.value));
+    }
+  }
+
+  const ex = document.getElementById('extraBlock');
+  if (ex) {
+    const c = ex.querySelectorAll('input[type=checkbox]:checked');
+    c.forEach(ch => chosen.push(ch.value));
+  }
+
+  return chosen;
+}
+</script>
